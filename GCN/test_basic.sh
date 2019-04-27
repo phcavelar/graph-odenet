@@ -16,9 +16,9 @@ python3 train_res.py --seed 42 --epochs 200 --model res3norm --runs 2500 --datas
 
 # ODE models are slower to train, and thus we test them with a lower number of runs
 
-python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 200 --dataset cora     >ode_cora.txt
-python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 200 --dataset citeseer >ode_citeseer.txt
-python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 50 --dataset pubmed   >ode_pubmed.txt
+python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 250 --dataset cora     >ode_cora.txt
+python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 250 --dataset citeseer >ode_citeseer.txt
+python3 train_res.py --seed 42 --epochs 200 --model ode3 --runs 250 --dataset pubmed   >ode_pubmed.txt
 
 # The models below have failed to converge on preliminary tests and thus we train them only for a small number of runs to collect results
 

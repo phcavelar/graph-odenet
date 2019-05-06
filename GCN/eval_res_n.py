@@ -18,17 +18,22 @@ parser.add_argument('--epochs', type=int, default=2000,
                     help='Number of epochs to train.')
 parser.add_argument('--runs', type=int, default=500,
                     help='Number of times to train and evaluate the model.')
-parser.add_argument('--layers_min', type=int, default=2,
+parser.add_argument('--layers_min', type=int, default=3,
                     help='Minimum number of layers to test with')
-parser.add_argument('--layers_max', type=int, default=4,
+parser.add_argument('--layers_max', type=int, default=5,
                     help='Maximum number of layers to test with')
 parser.add_argument('--dataset', choices=["cora", "citeseer", "pubmed"], default="cora",
                     help='Which dataset to use')
 
 model_dict = {
-  "GCNK": None,
-  "RESK1": None,
-  "RESK2": None,
+  "GCNK": models.GCNK,
+  "GCNKnorm": models.GCNKnorm,
+  "RESK1": models.RESK1,
+  "RESK2": models.RESK2,
+  "RESK1norm": models.RESK1norm,
+  "RESK2norm": models.RESK2norm,
+  "ODEK1": models.ODEK1,
+  "ODEK2": models.ODEK2,
 }
 
 args = parser.parse_args()
@@ -39,9 +44,15 @@ model_data = {}
 for m in model_dict:
     model_data[m] = {}
     
-    with open("{dataset}_{model}.pickle".format(dataset=args.dataset,model=m),"rb") as f:
-        model_data[m] = pickle.load(f)
-    #end with
+    try:
+        with open("{dataset}_{model}.pickle".format(dataset=args.dataset,model=m),"rb") as f:
+            model_data[m] = pickle.load(f)
+        #end with
+    except FileNotFoundError:
+        # Model wasn't trained/tested
+        model_dict[m] = None
+        model_data[m] = None
+        continue
 
     #print( "\t".join( [ "n_layers", "n_converged" , "n_bad", "converged_val_acc", "converged_val_acc_std", "converged_val_loss", "converged_val_loss_std", "layer_convergence",  "layer_convergence_std", "converged_test_acc", "converged_test_acc_std", "converged_test_loss", "converged_test_loss_std", "bad_val_acc", "bad_val_acc_std", "bad_val_loss", "bad_val_loss_std", "bad_epochs", "bad_epochs_std", "bad_test_acc", "bad_test_acc_std", "bad_test_loss", "bad_test_loss_std", ] ), file=f )
     
@@ -93,10 +104,10 @@ for m in model_dict:
     #end for nlayers
 #end for model
 
-markers = ['+','x','*','.',',','o']
+markers = ['+','x','*','.',',','o'] + ["|", "_", "1"]
 cmarkers = itertools.cycle(markers)
 #colors = ["#6457a6","#dbd56e","#664e4c","#8c271e","#a4c2a8","#000000",]
-colors = ["#6457a6ff","#dbd56eff","#664e4cff","#8c271eff","#a4c2a8ff","#000000ff",]
+colors = ["#6457a6ff","#dbd56eff","#664e4cff","#8c271eff","#a4c2a8ff","#000000ff",] + ["#e94f37","#3f88c5","#44bba4",]
 #colors = ['r','b','k','g','m','c']
 ccolors = itertools.cycle(colors)
 #colors_std = ['r','b','k','g','m','c']
@@ -214,3 +225,43 @@ for i, m in enumerate(model_dict):
 plt.legend()
 plt.savefig("{dataset}_c_iter_std.{figformat}".format(dataset=args.dataset,figformat=figformat))
 plt.close()
+
+with sns.color_palette( colors ):
+    ex_dict = {
+      "model": [],
+      "layers": [],
+      "accuracy": [],
+      "loss": [],
+      "convergence": [],
+    }
+    for m in model_dict:
+        for nlayers in range(model_data[m]["min_layers"],model_data[m]["max_layers"]):
+            for run in range(model_data[m]["layer_test_acc"].shape[1]):
+                ex_dict["model"].append( m )
+                ex_dict["layers"].append( nlayers )
+                ex_dict["accuracy"].append( model_data[m]["layer_test_acc"][nlayers,run] )
+                ex_dict["loss"].append( model_data[m]["layer_test_loss"][nlayers,run] )
+                ex_dict["convergence"].append( model_data[m]["layer_convergence"][nlayers,run] )
+            #end for
+        #end for
+    #end for
+
+    df = pd.DataFrame(ex_dict)
+    
+    for notch in [False,True]:
+        sns.boxplot(
+          x = "layers",
+          y = "accuracy",
+          hue = "model",
+          data = df,
+          notch = notch,
+        )
+        plt.ylim(-0.1,1.0)
+        plt.yticks( np.linspace(start=0,stop=1,num=8,endpoint=True) )
+        plt.savefig(
+                "{dataset}_boxplot{notch}.{figformat}".format(
+                    dataset = args.dataset,
+                    figformat = figformat,
+                    notch = "_notchless" if not notch else ""
+                ))
+        plt.close()

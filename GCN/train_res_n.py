@@ -23,9 +23,9 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
 parser.add_argument('--fastmode', action='store_true', default=False,
                     help='Validate during training pass.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=2,
+parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
-parser.add_argument('--runs', type=int, default=5,
+parser.add_argument('--runs', type=int, default=500,
                     help='Number of times to train and evaluate the model.')
 parser.add_argument('--lr', type=float, default=0.01,
                     help='Initial learning rate.')
@@ -112,14 +112,14 @@ def test(model, optimizer):
     return loss_test.item(), acc_test.item()
 
 if args.dataset=="cora":
-    acc_threshold = (0.7879 + 0.7785)/2 * 0.9
-    loss_threshold = (0.7375 + 0.7915)/2 * 1.1
+    acc_threshold = 0.7782 * 0.9
+    loss_threshold = 0.7929 * 1.1
 elif args.dataset=="citeseer":
-    acc_threshold = (0.6562 + 0.6451)/2 * 0.9
-    loss_threshold = (1.1587 + 1.2430)/2 * 1.1
+    acc_threshold = 0.6443 * 0.9
+    loss_threshold = 1.2454 * 1.1
 elif args.dataset=="pubmed":
-    acc_threshold = (0.7739 + 0.7726)/2 * 0.9
-    loss_threshold = (0.7068 + 0.7136)/2 * 1.1
+    acc_threshold = 0.7726 * 0.9
+    loss_threshold = 0.7136 * 1.1
 
 model_data = {}
 for m in model_dict:

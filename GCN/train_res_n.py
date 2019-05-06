@@ -33,9 +33,9 @@ parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
 parser.add_argument('--hidden', type=int, default=16,
                     help='Number of hidden units.')
-parser.add_argument('--layers_min', type=int, default=2,
+parser.add_argument('--layers_min', type=int, default=3,
                     help='Minimum number of layers to test with')
-parser.add_argument('--layers_max', type=int, default=4,
+parser.add_argument('--layers_max', type=int, default=5,
                     help='Maximum number of layers to test with')
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='Dropout rate (1 - keep probability).')
@@ -46,9 +46,14 @@ parser.add_argument('--early_stopping_epochs', type=int, default=10,
 parser.add_argument('--early_stopping_threshold', type=float, default=1e-10,
                     help='Minimum decrease in validation loss over last early_stopping_epochs.')
 model_dict = {
-  "GCNK": models.GCNK,
-  "RESK1": models.RESK1,
-  "RESK2": models.RESK2,
+#  "GCNK": models.GCNK,
+#  "GCNKnorm": models.GCNKnorm,
+#  "RESK1": models.RESK1,
+#  "RESK2": models.RESK2,
+#  "RESK1norm": models.RESK1norm,
+#  "RESK2norm": models.RESK2norm,
+#  "ODEK1": models.ODEK1,
+  "ODEK2": models.ODEK2,
 }
 
 args = parser.parse_args()

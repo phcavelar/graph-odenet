@@ -19,6 +19,50 @@ class GCN(nn.Module):
         x = self.gc2(x, adj)
         return F.log_softmax(x, dim=1)
 
+class RGCN2(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout):
+        super(RGCN2, self).__init__()
+        
+        if nhid<nclass:
+            raise ValueError("nhid must be equal or larger than nclass")
+
+        self.gc1 = GraphConvolution(nfeat, nhid)
+        self.gc2 = GraphConvolution(nhid, nhid)
+        self.nclass = nclass
+        self.dropout = dropout
+
+    def forward(self, x, adj):
+        x = F.relu(self.gc1(x, adj))
+        x = F.dropout(x, self.dropout, training=self.training)
+        r = x
+        x = self.gc2(x, adj)
+        x = x + r
+        return F.log_softmax(x[:,:self.nclass], dim=1)
+        
+class ODEGCN2(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout):
+        super(ODEGCN2, self).__init__()
+        
+        if nhid<nclass:
+            raise ValueError("nhid must be equal or larger than nclass")
+
+        self.gc1 = GraphConvolution(nfeat, nhid)
+        self.gc2 = ODEBlock(ODEfunc(nhid))
+        self.dropout = dropout
+
+    def forward(self, x, adj):
+        x = F.relu(self.gc1(x, adj))
+        x = self.gc2(x, adj)
+        return F.log_softmax(x[:,:self.nclass], dim=1)
+
+    @property
+    def nfe(self):
+        return self.gc2.nfe
+
+    @nfe.setter
+    def nfe(self, value):
+        self.gc2.nfe = value
+
 class GCN3(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout):
         super(GCN3, self).__init__()
@@ -116,16 +160,14 @@ class RGCN3fullnorm(nn.Module):
 
 class ODEfunc(nn.Module):
 
-    def __init__(self, dim, dropout):
+    def __init__(self, dim):
         super(ODEfunc, self).__init__()
         self.norm1 =  nn.GroupNorm(min(32, dim), dim)
         self.gc1 = FixedGraphConvolution(dim+1, dim)
-        self.dropout = dropout
         self.nfe = 0
         
     def set_adj(self,adj):
         self.gc1.set_adj( adj )
-        #self.gc2.set_adj( adj )
 
     def forward(self, t, x):
         self.nfe += 1
@@ -138,7 +180,7 @@ class ODEfunc(nn.Module):
 
 class ODEBlock(nn.Module):
 
-    def __init__(self, odefunc, dropout, tol=1e-5):
+    def __init__(self, odefunc, tol=1e-5):
         super(ODEBlock, self).__init__()
         self.odefunc = odefunc
         self.integration_time = torch.tensor([0, 1]).float()
@@ -164,7 +206,7 @@ class ODEGCN3(nn.Module):
         super(ODEGCN3, self).__init__()
 
         self.gc1 = GraphConvolution(nfeat, nhid)
-        self.gc2 = ODEBlock(ODEfunc(nhid,dropout),dropout)
+        self.gc2 = ODEBlock(ODEfunc(nhid))
         self.gc3 = GraphConvolution(nhid, nclass)
         self.dropout = dropout
 
@@ -190,7 +232,7 @@ class ODEGCN3fullnorm(nn.Module):
 
         self.gc1 = GraphConvolution(nfeat, nhid)
         self.norm1 = nn.GroupNorm(min(32, nhid), nhid)
-        self.gc2 = ODEBlock(ODEfunc(nhid,dropout),dropout)
+        self.gc2 = ODEBlock(ODEfunc(nhid))
         self.gc3 = GraphConvolution(nhid, nclass)
         self.dropout = dropout
 
@@ -490,7 +532,7 @@ class ODEK1(nn.Module):
         self.n_layers = nlayers
         stacked_layers = (
             [GraphConvolution(nfeat, nhid)] +
-            [ODEBlock(ODEfunc(nhid,dropout),dropout) for _ in range(self.n_layers - 2) ] +
+            [ODEBlock(ODEfunc(nhid)) for _ in range(self.n_layers - 2) ] +
             [GraphConvolution(nhid, nclass)]
         )
         self.gcs = nn.ModuleList(stacked_layers)
@@ -542,7 +584,7 @@ class ODEK2(nn.Module):
         self.n_layers = nlayers
         stacked_layers = (
             [GraphConvolution(nfeat, nhid)] +
-            [ODEBlock(ODEfunc2(nhid,dropout),dropout) for _ in range((self.n_layers - 2)//2)] + ([ODEBlock(ODEfunc(nhid,dropout),dropout)] if nlayers%2==1 else []) +
+            [ODEBlock(ODEfunc2(nhid,dropout),dropout) for _ in range((self.n_layers - 2)//2)] + ([ODEBlock(ODEfunc(nhid))] if nlayers%2==1 else []) +
             [GraphConvolution(nhid, nclass)]
         )
         self.gcs = nn.ModuleList(stacked_layers)

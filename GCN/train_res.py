@@ -36,7 +36,7 @@ parser.add_argument('--dataset', choices=["cora", "citeseer", "pubmed"], default
                     help='Which dataset to use')
 parser.add_argument('--model', choices=["gcn2", "gcn3", "gcn3norm", "res3", "ode3", "res3norm", "res3fullnorm", "ode3norm"], default="res3",
                     help='Which model to train')
-model_dict = {"GCN2": models.GCN, "GCN3": models.GCN3, "GCN3NORM": models.GCN3, "RES3": models.RGCN3, "ODE3": models.ODEGCN3, "RES3NORM": models.RGCN3norm, "RES3FULLNORM": models.RGCN3fullnorm, "ODE3NORM": models.ODEGCN3fullnorm}
+model_dict = {"GCN3": models.GCN3, "GCN3NORM": models.GCN3, "RES3": models.RGCN3, "ODE3": models.ODEGCN3, "RES3NORM": models.RGCN3norm, "RES3FULLNORM": models.RGCN3fullnorm, "ODE3NORM": models.ODEGCN3fullnorm}
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()

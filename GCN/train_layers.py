@@ -46,13 +46,13 @@ parser.add_argument('--early_stopping_epochs', type=int, default=10,
 parser.add_argument('--early_stopping_threshold', type=float, default=1e-10,
                     help='Minimum decrease in validation loss over last early_stopping_epochs.')
 model_dict = {
-#  "GCNK": models.GCNK,
-#  "GCNKnorm": models.GCNKnorm,
-#  "RESK1": models.RESK1,
-#  "RESK2": models.RESK2,
-#  "RESK1norm": models.RESK1norm,
-#  "RESK2norm": models.RESK2norm,
-#  "ODEK1": models.ODEK1,
+  "GCNK": models.GCNK,
+  "GCNKnorm": models.GCNKnorm,
+  "RESK1": models.RESK1,
+  "RESK2": models.RESK2,
+  "RESK1norm": models.RESK1norm,
+  "RESK2norm": models.RESK2norm,
+  "ODEK1": models.ODEK1,
   "ODEK2": models.ODEK2,
 }
 

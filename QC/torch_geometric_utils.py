@@ -1,9 +1,8 @@
 from torch_scatter import scatter_max, scatter_add
 
-from .num_nodes import maybe_num_nodes
+def maybe_num_nodes(index, num_nodes=None):
+    return index.max().item() + 1 if num_nodes is None else num_nodes
 
-
-[docs]
 def softmax(src, index, num_nodes=None):
     r"""Computes a sparsely evaluated softmax.
     Given a value tensor :attr:`src`, this function first groups those values

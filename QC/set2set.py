@@ -1,10 +1,12 @@
 # Taken and adapted from https://github.com/rusty1s/pytorch_geometric
 
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch_scatter import scatter_add
 from torch_geometric_utils import softmax
 
-class Set2Set(torch.nn.Module):
+class Set2Set(nn.Module):
     r"""The global pooling operator based on iterative content-based attention
     from the `"Order Matters: Sequence to sequence for sets"
     <https://arxiv.org/abs/1511.06391>`_ paper
@@ -38,7 +40,7 @@ class Set2Set(torch.nn.Module):
         self.processing_steps = processing_steps
         self.num_layers = num_layers
 
-        self.lstm = torch.nn.LSTM(self.out_channels, self.in_channels,
+        self.lstm = nn.LSTM(self.out_channels, self.in_channels,
                                   num_layers)
 
         self.reset_parameters()
@@ -53,14 +55,36 @@ class Set2Set(torch.nn.Module):
         h = (x.new_zeros((self.num_layers, batch_size, self.in_channels)),
              x.new_zeros((self.num_layers, batch_size, self.in_channels)))
         q_star = x.new_zeros(batch_size, self.out_channels)
-
-        for i in range(self.processing_steps):
-            q, h = self.lstm(q_star.unsqueeze(0), h)
-            q = q.view(batch_size, self.in_channels)
-            e = (x * q[batch]).sum(dim=-1, keepdim=True)
-            a = softmax(e, batch, num_nodes=batch_size)
-            r = scatter_add(a * x, batch, dim=0, dim_size=batch_size)
-            q_star = torch.cat([q, r], dim=-1)
+        
+        if not x.is_cuda: # CPU ver
+          for i in range(self.processing_steps):
+              q, h = self.lstm(q_star.unsqueeze(0), h)
+              q = q.view(batch_size, self.in_channels)
+              e = (x * q[batch]).sum(dim=-1, keepdim=True)
+              a = softmax(e, batch, num_nodes=batch_size)
+              
+              r = scatter_add(a * x, batch, dim=0, dim_size=batch_size)
+              q_star = torch.cat([q, r], dim=-1)
+           #end for
+        else: # CUDA version
+          a = torch.zeros( [x.size()[0],1], dtype=x.dtype, device=x.device )
+          one_t = torch.ones_like( batch , dtype=batch.dtype, device=batch.device)
+          for i in range(self.processing_steps):
+              q, h = self.lstm(q_star.unsqueeze(0), h)
+              q = q.view(batch_size, self.in_channels)
+              e = (x * q[batch]).sum(dim=-1, keepdim=True)
+              # Softmax
+              for i in range(batch_size):
+                  mask = batch.eq(one_t*i)
+                  elements_to_softmax = torch.masked_select( e.squeeze(), mask )
+                  softmaxed_elements = F.softmax(elements_to_softmax, dim=0 ).unsqueeze(1)
+                  a[mask] = softmaxed_elements
+              #end for
+              
+              r = scatter_add(a * x, batch, dim=0, dim_size=batch_size)
+              q_star = torch.cat([q, r], dim=-1)
+           #end for
+       #end if-else
 
         return q_star
 
@@ -68,5 +92,4 @@ class Set2Set(torch.nn.Module):
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.in_channels,
                                    self.out_channels)
-
 

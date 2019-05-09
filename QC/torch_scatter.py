@@ -28,15 +28,134 @@ def gen(src, index, dim=-1, out=None, dim_size=None, fill_value=0):
 
     return src, out, index, dim
     
-def scatter_max_manual(src,index,out,arg,dim):
-    raise NotImplementedError()
-    """
-    for i in range(index.size(dim)):
-        idx = index_data[i * index_stride]
-        if src_data[i * src_stride] >= out_data[idx * out_stride]):
-            out_data[idx * out_stride] = src_data[i * src_stride]
-            arg_data[idx * arg_stride] = i
-    """
+def scatter_max_manual(
+        src, # Tensor
+        index, # Tensor
+        out, # Tensor
+        arg, # Tensor
+        dim # int64
+        ):
+    """ Direct translation of C++ code, without any parallelism"""
+    DEVICE = src.device
+    elements_per_row = index.size(dim) # int64
+    i = 0 # int64
+    idx = 0 # int64
+    
+    # START DIM_APPLY4
+    #TYPE1 = src.dtype # DTYPE
+    #TENSOR1 = src # Tensor
+    #TYPE2 = torch.long DTYPE
+    #TENSOR2 = index # Tensor
+    #TYPE3 = out.dtype # DTYPE
+    #TENSOR3 = out # Tensor
+    #TYPE4 = torch.long # DTYPE
+    #TENSOR4 = arg # Tensor
+    #DIM = dim # int64
+    #CODE = None # 
+    
+    src_data = src.storage() # Tensor_Storage
+    src_data_ptr = 0 # int64
+    src_size = src.size(dim) # int64
+    src_stride = src.stride(dim)
+    
+    index_data = index.storage() # Tensor_Storage
+    index_data_ptr = 0 # int64?
+    index_size = index.size(dim) # int64?
+    index_stride = index.stride(dim)
+    
+    out_data = out.storage() # Tensor_Storage
+    out_data_ptr = 0 # int64
+    out_size = out.size(dim) # int64?
+    out_stride = out.stride(dim) # int64?
+    
+    arg_data = arg.storage() # Tensor_Storage
+    arg_data_ptr = 0 # int64
+    arg_size = arg.size(dim) # int64?
+    arg_stride = arg.stride(dim) # int64?
+    
+    dims = index.dim() # int64?
+    zeros = torch.zeros(dims, dtype=torch.long, device=DEVICE) # Tensor
+    counter = zeros.storage() # Tensor Storage
+    has_finished = False # boolean
+    while not has_finished:
+        # START MAX FUNC CODE
+        for i in range(elements_per_row):
+          idx = index_data[index_data_ptr + i * index_stride]
+          if src_data[src_data_ptr + i * src_stride] >= out_data[out_data_ptr + idx * out_stride]:
+              out_data[out_data_ptr + idx * out_stride] = src_data[src_data_ptr + i * src_stride]
+              arg_data[arg_data_ptr + idx * arg_stride] = i
+        """ C++ ver
+        for (i = 0; i < elems_per_row; i++) {
+            idx = index_data[i * index_stride];
+            if (src_data[i * src_stride] >= out_data[idx * out_stride]) {
+                out_data[idx * out_stride] = src_data[i * src_stride];
+                arg_data[idx * arg_stride] = i;
+            }
+        }
+        """
+        # END MAX FUNC CODE
+        if dims == 1:
+            break
+        #end if
+        
+        # Changed from for to while to keep variable lifetime outside
+        cur_dim = 0
+        for cur_dim_ in range(dims):
+            cur_dim = cur_dim_
+            if cur_dim == dim:
+                if cur_dim == dims-1:
+                    has_finished = True
+                    break
+                #end if
+                continue
+            #end if
+        #end for
+        
+        counter[cur_dim] += 1
+        src_data_ptr += src.stride( cur_dim )
+        index_data_ptr += out.stride( cur_dim )
+        out_data_ptr += out.stride( cur_dim )
+        arg_data_ptr += arg.stride( cur_dim )
+        
+        if counter[cur_dim] == src.size(cur_dim):
+            if cur_dim == dims - 1:
+                has_finished = True
+                break
+            else:
+                src_data_ptr -= counter[cur_dim] * src.stride(cur_dim)
+                index_data_ptr -= counter[cur_dim] * index.stride(cur_dim)
+                out_data_ptr -= counter[cur_dim] * out.stride(cur_dim)
+                arg_data_ptr -= counter[cur_dim] * arg.stride(cur_dim)
+                counter[cur_dim] = 0
+            #end if-else
+        else:
+            break
+        #end if-else
+        print( cur_dim )
+    #end while
+    # END DIM_APPLY4
+#end scatter_max_manual_agnostic
+    
+def scatter_max_manual_gpu(
+        src, # Tensor
+        index, # Tensor
+        out, # Tensor
+        arg, # Tensor
+        dim # int64
+        ):
+    # TODO: Optimise for GPU?
+    scatter_max_manual(src,index,out,arg,dim)
+#end scatter_max_manual_gpu
+    
+def scatter_max_manual_cpu(
+        src, # Tensor
+        index, # Tensor
+        out, # Tensor
+        arg, # Tensor
+        dim # int64
+        ):
+    scatter_max_manual(src,index,out,arg,dim)
+#end scatter_max_manual_cpu
     
     
 def get_func(name, tensor):
@@ -105,7 +224,7 @@ class ScatterMax(Function):
     @staticmethod
     def forward(ctx, out, src, index, dim):
         arg = index.new_full(out.size(), -1)
-        func = scatter_max_manual#get_func('scatter_max', src)
+        func = scatter_max_manual_cpu#get_func('scatter_max', src)
         func(src, index, out, arg, dim)
 
         ctx.mark_dirty(out)
@@ -121,7 +240,7 @@ class ScatterMax(Function):
         grad_src = None
         if ctx.needs_input_grad[1]:
             grad_src = grad_out.new_zeros(index.size())
-            func = scatter_max_manual#get_func('index_backward', grad_out)
+            func = scatter_max_manual_gpu#get_func('index_backward', grad_out)
             func(grad_out, index, arg, grad_src, ctx.dim)
 
         return None, grad_src, None, None
@@ -178,8 +297,15 @@ def scatter_max(src, index, dim=-1, out=None, dim_size=None, fill_value=None):
                [ 1,  4,  3, -1, -1, -1]])
     """
     if fill_value is None:
-        op = torch.finfo if torch.is_floating_point(src) else torch.iinfo
-        fill_value = op(src.dtype).min
+        # This code was not working with error AttributeError: 'torch.finfo' object has no attribute 'min'
+        #op = torch.finfo if torch.is_floating_point(src) else torch.iinfo
+        #fill_value = op(src.dtype).min
+        # Workaround:
+        if torch.is_floating_point(src):
+            fill_value = -torch.finfo(src.dtype).max
+        else:
+            fill_value = torch.iinfo(src.dtype).min
+        #end if
     src, out, index, dim = gen(src, index, dim, out, dim_size, fill_value)
     if src.size(dim) == 0:  # pragma: no cover
         return out, index.new_full(out.size(), -1)

@@ -14,7 +14,7 @@ import models
 # Training settings
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=2000,
+parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
 parser.add_argument('--runs', type=int, default=500,
                     help='Number of times to train and evaluate the model.')
@@ -27,13 +27,13 @@ parser.add_argument('--dataset', choices=["cora", "citeseer", "pubmed"], default
 
 model_dict = {
   "GCNK": models.GCNK,
-  "GCNKnorm": models.GCNKnorm,
+#  "GCNKnorm": models.GCNKnorm,
   "RESK1": models.RESK1,
-  "RESK2": models.RESK2,
+#  "RESK2": models.RESK2,
   "RESK1norm": models.RESK1norm,
-  "RESK2norm": models.RESK2norm,
+#  "RESK2norm": models.RESK2norm,
   "ODEK1": models.ODEK1,
-  "ODEK2": models.ODEK2,
+#  "ODEK2": models.ODEK2,
 }
 
 args = parser.parse_args()
@@ -248,20 +248,29 @@ with sns.color_palette( colors ):
 
     df = pd.DataFrame(ex_dict)
     
-    for notch in [False,True]:
-        sns.boxplot(
-          x = "layers",
-          y = "accuracy",
-          hue = "model",
-          data = df,
-          notch = notch,
-        )
-        plt.ylim(-0.1,1.0)
-        plt.yticks( np.linspace(start=0,stop=1,num=8,endpoint=True) )
-        plt.savefig(
-                "{dataset}_boxplot{notch}.{figformat}".format(
-                    dataset = args.dataset,
-                    figformat = figformat,
-                    notch = "_notchless" if not notch else ""
-                ))
-        plt.close()
+    for metric in ["accuracy", "loss", "convergence"]:
+        for notch in [False,True]:
+            sns.boxplot(
+              x = "layers",
+              y = metric,
+              hue = "model",
+              data = df,
+              notch = notch,
+            )
+            if metric == "accuracy":
+                plt.ylim(-0.1,1.0)
+                plt.yticks( np.linspace(start=0,stop=1,num=8,endpoint=True) )
+                plt.legend(loc='lower left')
+            elif metric == "loss":
+                plt.legend(loc='upper left')
+            elif metric == "convergence":
+                plt.ylim(0,args.epochs+10)
+                #plt.legend(loc='lower center')
+            plt.savefig(
+                    "{dataset}_{metric}_boxplot{notch}.{figformat}".format(
+                        metric = metric,
+                        dataset = args.dataset,
+                        figformat = figformat,
+                        notch = "_notchless" if not notch else ""
+                    ))
+            plt.close()

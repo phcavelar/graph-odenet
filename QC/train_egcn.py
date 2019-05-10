@@ -52,7 +52,7 @@ parser.add_argument('--plot_path', default='./plot/{model}/{dataset}/', help='pl
 parser.add_argument('--resume', default='./checkpoint/{model}/{dataset}/',
                     help='path to latest checkpoint')
 # Optimization Options
-parser.add_argument('--model', choices=["egcn3", "egcn3s2s", "enn", "enns2s", "eres3", "eres3s2s", "eode3"], default="egc3",
+parser.add_argument('--model', choices=["egcn3", "egcn3s2s", "ennsum", "enns2s", "eres3", "eres3s2s", "eode3"], default="egc3",
                     help='Which model to train')
 parser.add_argument('--batch-size', type=int, default=20, metavar='N',
                     help='Input batch size for training (default: 20)')
@@ -100,7 +100,7 @@ class UnimplementedModel(nn.Module):
 model_dict = {
         "egcn3": models.EdgeGCN3_Sum,
         "egcn3s2s": models.EdgeGCN3_Set2Set,
-        "enn": models.MPNN_ENN_Sum,
+        "ennsum": models.MPNN_ENN_Sum,
         "enns2s": models.MPNN_ENN_Set2Set,
         "eres3": UnimplementedModel,
         "eres3s2s": UnimplementedModel,

@@ -1,3 +1,5 @@
+# Adapted from https://github.com/rusty1s/pytorch_geometric
+
 from torch_scatter import scatter_max, scatter_add
 
 def maybe_num_nodes(index, num_nodes=None):

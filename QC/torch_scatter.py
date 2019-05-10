@@ -1,4 +1,5 @@
-# Taken and adapted from http://rusty1s.github.io/pytorch_scatter
+# Adapted from https://github.com/rusty1s/pytorch_scatter
+
 import torch
 from torch.autograd import Function
 from itertools import repeat

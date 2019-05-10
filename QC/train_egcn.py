@@ -52,7 +52,7 @@ parser.add_argument('--plot_path', default='./plot/{model}/{dataset}/', help='pl
 parser.add_argument('--resume', default='./checkpoint/{model}/{dataset}/',
                     help='path to latest checkpoint')
 # Optimization Options
-parser.add_argument('--model', choices=["egcn3", "egcn3s2s", "ennsum", "enns2s", "eres3", "eres3s2s", "eode3"], default="egc3",
+parser.add_argument('--model', choices=["egcn3sum", "egcn3s2s", "ennsum", "enns2s", "eres3sum", "eres3s2s", "eode3sum", "eode3s2s"], default="egc3",
                     help='Which model to train')
 parser.add_argument('--batch-size', type=int, default=20, metavar='N',
                     help='Input batch size for training (default: 20)')
@@ -98,13 +98,14 @@ class UnimplementedModel(nn.Module):
 #end UnimplementedModel
 
 model_dict = {
-        "egcn3": models.EdgeGCN3_Sum,
+        "egcn3sum": models.EdgeGCN3_Sum,
         "egcn3s2s": models.EdgeGCN3_Set2Set,
         "ennsum": models.MPNN_ENN_Sum,
         "enns2s": models.MPNN_ENN_Set2Set,
-        "eres3": UnimplementedModel,
+        "eres3sum": UnimplementedModel,
         "eres3s2s": UnimplementedModel,
-        "ODE3NORM": UnimplementedModel,
+        "eode3sum": UnimplementedModel,
+        "eode3s2s": UnimplementedModel,
 }
 
 def main():
@@ -152,6 +153,11 @@ def main():
     type ='regression'
     model = Model_Class(in_n, in_e, hidden_state_size, l_target, dropout=0.5, type=type)
     del in_n, hidden_state_size, n_layers, l_target, type
+
+    #print('Check cuda for model')
+    #if args.cuda:
+    #    print('\t* Cuda')
+    #    model = model.cuda()
 
     print('\tStatistics')
     stat_dict = datasets.utils.get_graph_stats(data_valid, ['target_mean', 'target_std'])
@@ -201,6 +207,8 @@ def main():
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_er1']
             model.load_state_dict(checkpoint['state_dict'])
+            if args.cuda:
+                model.cuda()
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded best model '{}' (epoch {})".format(best_model_file, checkpoint['epoch']))
         else:
@@ -309,13 +317,13 @@ def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                   'Error Ratio {err.val:.4f} ({err.avg:.4f})'
                   .format(epoch, i, len(train_loader), batch_time=batch_time,
-                          data_time=data_time, loss=losses, err=error_ratio))
+                          data_time=data_time, loss=losses, err=error_ratio), flush=True)
                           
     logger.log_value('train_epoch_loss', losses.avg)
     logger.log_value('train_epoch_error_ratio', error_ratio.avg)
 
     print('Epoch: [{0}] Avg Error Ratio {err.avg:.3f}; Average Loss {loss.avg:.3f}; Avg Time x Batch {b_time.avg:.3f}'
-          .format(epoch, err=error_ratio, loss=losses, b_time=batch_time))
+          .format(epoch, err=error_ratio, loss=losses, b_time=batch_time), flush=True)
 
 
 def validate(val_loader, model, criterion, evaluation, logger=None):
@@ -359,13 +367,13 @@ def validate(val_loader, model, criterion, evaluation, logger=None):
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Error Ratio {err.val:.4f} ({err.avg:.4f})'
                       .format(i, len(val_loader), batch_time=batch_time,
-                              loss=losses, err=error_ratio))
+                              loss=losses, err=error_ratio), flush=True)
             #end if
         #end for
     #end torch.no_grad
 
     print(' * Average Error Ratio {err.avg:.3f}; Average Loss {loss.avg:.3f}'
-          .format(err=error_ratio, loss=losses))
+          .format(err=error_ratio, loss=losses), flush=True)
 
     if logger is not None:
         logger.log_value('test_epoch_loss', losses.avg)

@@ -109,12 +109,12 @@ class EdgeGCN3_Set2Set(nn.Module):
         self.gc1 = EdgeGraphConvolution( node_features, hidden_features )
         self.gc2 = EdgeGraphConvolution( hidden_features, hidden_features )
         self.gc3 = EdgeGraphConvolution( hidden_features, out_features )
-        self.s2s = Set2Set(out_features, processing_steps, num_layers=1)
         self.dropout = dropout
         
         self.ee1 = EdgeEncoderMLP( edge_features, hidden_features )
         self.ee2 = EdgeEncoderMLP( edge_features, hidden_features )
         self.ee3 = EdgeEncoderMLP( edge_features, out_features )
+        self.s2s = Set2Set(out_features, processing_steps, num_layers=1)
     #end __init__
     
     def forward(self,
@@ -124,7 +124,6 @@ class EdgeGCN3_Set2Set(nn.Module):
             Etgt,    # N x E :: Float
             batch,   # B x N :: Float
             ):
-        batch_size = batch.max().item() + 1
         x = node_features
         
         ef1 = self.ee1(edge_features)

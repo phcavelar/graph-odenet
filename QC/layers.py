@@ -62,10 +62,21 @@ class MLP(Module):
     #end forward
 #end MLP
 
+class TransitionMLP(Module):
+    def __init__(self, in_features, out_features, bias=True):
+        super(TransitionMLP, self).__init__()
+        self.mlp = MLP(  in_features, [(in_features+out_features)//2], out_features, bias=bias )
+    #end __init__
+    
+    def forward(self, input):
+        return self.mlp(input)
+    #end forward
+#end MLP
+
 class EdgeEncoderMLP(Module):
     def __init__(self, edge_features, node_features, bias=True):
         super(EdgeEncoderMLP, self).__init__()
-        self.mlp = MLP(  edge_features, [(edge_features+node_features*node_features)//2], node_features*node_features )
+        self.mlp = TransitionMLP(  edge_features, node_features*node_features, bias=bias )
         self.nf = node_features
     #end __init__
     
@@ -130,7 +141,7 @@ class EdgeGraphConvolution(Module):
             ):
         support = torch.mm(input, self.weight) # N x fo
         edge_support = torch.index_select( support, 0, Esrc ) # E x fo
-        edge_msg = torch.bmm( edge_data, edge_support.unsqueeze(-1) ).squeeze() # E x fo
+        edge_msg = torch.bmm( edge_data, edge_support.unsqueeze(-1) ).squeeze(-1) # E x fo
         output = torch.spmm( Etgt, edge_msg ) # N x fo
         if self.bias is not None:
             return output + self.bias

@@ -65,7 +65,7 @@ class Set2Set(nn.Module):
             a = torch.zeros( [x.size()[0]], dtype=x.dtype, device=x.device )
             for i in range(batch_size):
                 mask = batch.eq(one_t*i)
-                elements_to_softmax = torch.masked_select( e.squeeze(), mask )
+                elements_to_softmax = torch.masked_select( e.squeeze(-1), mask )
                 softmaxed_elements = F.softmax(elements_to_softmax, dim=0 )
                 a[mask] += softmaxed_elements
             #end for

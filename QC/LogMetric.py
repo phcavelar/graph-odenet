@@ -5,6 +5,7 @@
 
 import numpy as np
 import os
+import tensorboard_logger
 from tensorboard_logger import configure, log_value
 
 __author__ = "Pau Riba, Anjan Dutta"
@@ -21,6 +22,26 @@ def error_ratio(pred, target):
 
 
 class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        if self.count:
+            self.val = val
+            self.avg = self.avg * (self.count-n)/self.count + val * n / self.count
+            self.count += n
+        else:
+            self.val = val
+            self.avg = val
+            self.count += n
+
+class AverageMeter__UNUSED(object):
     """Computes and stores the average and current value"""
     def __init__(self):
         self.reset()
@@ -48,12 +69,14 @@ class Logger(object):
             self._remove(log_dir)
 
         # configure the project
-        configure(log_dir)
+        self.logger = tensorboard_logger.Logger(log_dir)
+        #configure(log_dir)
 
         self.global_step = 0
 
     def log_value(self, name, value):
-        log_value(name, value, self.global_step)
+        self.logger.log_value(name, value, self.global_step)
+        #log_value(name, value, self.global_step)
         return self
 
     def step(self):

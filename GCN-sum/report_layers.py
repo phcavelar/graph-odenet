@@ -18,22 +18,22 @@ parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
 parser.add_argument('--runs', type=int, default=500,
                     help='Number of times to train and evaluate the model.')
-parser.add_argument('--layers_min', type=int, default=3,
+parser.add_argument('--layers_min', type=int, default=2,
                     help='Minimum number of layers to test with')
-parser.add_argument('--layers_max', type=int, default=5,
+parser.add_argument('--layers_max', type=int, default=12,
                     help='Maximum number of layers to test with')
 parser.add_argument('--dataset', choices=["cora", "citeseer", "pubmed"], default="cora",
                     help='Which dataset to use')
 
 model_dict = {
   "GCNK": models.GCNK,
-  "GCNKnorm": models.GCNKnorm,
+#  "GCNKnorm": models.GCNKnorm,
   "RESK1": models.RESK1,
   "RESK2": models.RESK2,
   "RESK1norm": models.RESK1norm,
   "RESK2norm": models.RESK2norm,
-  "ODEK1": models.ODEK1,
-  "ODEK2": models.ODEK2,
+#  "ODEK1": models.ODEK1,
+#  "ODEK2": models.ODEK2,
 }
 
 args = parser.parse_args()

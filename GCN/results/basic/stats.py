@@ -10,10 +10,10 @@ models = [m for m in sys.argv[2:]]
 model_name = {
   "gcn": "GCN-3",
   "gcnnorm": "GCN-norm-3",
-  "res": "RGCN-3",
-  "resnorm": "RGCN-norm-3",
+  "res": "RES-3",
+  "resnorm": "RES-norm-3",
   "gcnfullnorm": "GCN-fullnorm",
-  "resfullnorm": "RGCN-fullnorm",
+  "resfullnorm": "RES-fullnorm",
   "ode": "ODE-GCN-norm-3",
   "odefullnorm": "ODE-GCN-fullnorm-3",
 }
@@ -40,11 +40,20 @@ for m in models:
 
 colors = ["#6457a6","#664e4c","#9b8816","#8c271e","#002400","#000000",]
 
-plt.hist([v for v in model_vals], bins=25, normed=True, color=[model_color[m] for m in models],label=[model_name[m] for m in models])
+plt.rcParams.update({"font.size":16})
+plt.subplots(figsize=(12.8,4.8))
+plt.hist([v for v in model_vals], bins=50, density=True, color=[model_color[m] for m in models],label=[model_name[m] for m in models])
 plt.legend()
+plt.ylabel("Frequency")
 plt.xlabel("Accuracy (%)")
-plt.ylabel("Bins")
 plt.savefig("hist_{}_{}.pdf".format(dataset,"__".join(models)), bbox_inches="tight")
+plt.close()
+plt.subplots(figsize=(12.8,4.8))
+plt.hist([v for v in model_vals], bins=50, cumulative=True, density=True, color=[model_color[m] for m in models],label=[model_name[m] for m in models])
+plt.legend()
+plt.ylabel("Frequency")
+plt.xlabel("Accuracy (%)")
+plt.savefig("cumhist_{}_{}.pdf".format(dataset,"__".join(models)), bbox_inches="tight")
 
 for m, v in zip(models,model_vals):
   print("Shapiro {m}".format(m=m), sps.shapiro(v))

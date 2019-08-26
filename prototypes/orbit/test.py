@@ -108,17 +108,13 @@ while True:
                     force_placeholder=f,
                     distance_placeholder=d
             )
-            #p[:]=p2[:]
-            aux = p
-            p = p2
-            p2 = aux
+
+            # Swap position and velocities
+            p, p2 = p2, p
+            v, v2 = v2, v
+        # end if
+    # end for
             
-            #v[:]=v2[:]
-            aux = v
-            v = v2
-            v2 = aux
-        #end if
-    #end for
     if redraw:
         delay = (delay + 1) % TIMESTEP_DELAY
         if not delay:

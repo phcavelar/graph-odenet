@@ -93,7 +93,7 @@ pygame.time.set_timer(TIME_EVENT_ID,int(1000*TIME_DELTA))
 
 delay = 0
 while True:
-    redraw=True
+    redraw = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT: sys.exit()
         if event.type == TIME_EVENT_ID:

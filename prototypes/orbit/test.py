@@ -14,7 +14,7 @@ COLOR_BLUE = (109, 196, 255)
 G = 39.478
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
-NUM_OF_BODIES = 5
+NUM_OF_BODIES = 2
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
 WIDTH = 1620
@@ -22,7 +22,7 @@ HEIGHT = 1080
 
 
 def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
-          force_placeholder=None, distance_placeholder=None, G=39.478):
+          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-6):
     out_pos, out_vel, force_placeholder = map(lambda x: np.empty_like(
         pos) if x is None else x, (out_pos, out_vel, force_placeholder))
 
@@ -40,7 +40,7 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
             if i != j:
                 force_placeholder[i] -= distance_placeholder[i, j, :] * \
                     (G * m[i] * m[j] /
-                     (np.linalg.norm(distance_placeholder[i, j, :]) ** 2))
+                     (epsilon + np.linalg.norm(distance_placeholder[i, j, :]) ** 2))
 
     out_vel = np.add(vel, force_placeholder / mass * dt, out=out_vel)
     out_pos = np.add(pos, (vel + (out_vel - vel) / 2) * dt, out=out_pos)
@@ -96,13 +96,10 @@ pygame.init()
 size = WIDTH, HEIGHT
 screen = pygame.display.set_mode(size)
 
-font = pygame.font.SysFont('Arial', 16)
-text = font.render('0', True, COLOR_BLUE)
-textRect = text.get_rect()
 pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
 
 delay = 0
-bla, ble = float("-inf"), float("inf")
+Umax, Umin = float("-inf"), float("inf")
 while True:
     redraw = False
     for event in pygame.event.get():
@@ -124,25 +121,17 @@ while True:
             # Swap position and velocities
             p, p2 = p2, p
             v, v2 = v2, v
-
-            #pairshape = [m.shape[0], m.shape[0]]
-            # pairmask = np.ones(
-            #    pairshape+[1], dtype=np.int) - np.eye(m.shape[0], dtype=np.int)[..., np.newaxis]
+            
+            # Check for energy conservation
             Ug = 0
             for i in range(m.shape[0]):
                 for j in range(m.shape[0]):
                     if i != j:
-                        Ug -= G*(m[i] * m[j])/np.linalg.norm(p[i]-p[j])
-
+                        Ug -= G*(m[i,0] * m[j,0])/np.linalg.norm(p[i]-p[j])
             Uv = np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2)
-            # Ug = np.sum(-G*(m.view()[np.newaxis, :, :] * m.view()[:, np.newaxis, :])[
-            #            pairmask]/(p.view()[np.newaxis, :, :]-p.view()[:, np.newaxis, :])[pairmask])
-
-            # bla = max(
-            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), bla)
-            # ble = min(
-            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), ble)
-            print(Uv+Ug, Uv, Ug)
+            U = Uv+Ug
+            Umax, Umin = max(Umax,U), min(Umin,U)
+            print(Umin,Umax,U, Uv, Ug)
         # end if
     # end for
 

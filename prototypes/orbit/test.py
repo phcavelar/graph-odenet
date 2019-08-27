@@ -11,7 +11,7 @@ COLOR_BLUE = (109, 196, 255)
 
 # Multiply by a big constant, otherwise the bodies would not move given
 # the small value of the gravitational constant
-G = 6.67408e-11 * 100_000_000
+G = 39.478
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
 NUM_OF_BODIES = 5
@@ -84,12 +84,12 @@ center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
 distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
 _, _, centripetal_force = nbody(TIME_DELTA, p, v, m)
 for i in range(NUM_OF_BODIES):
-    v[i, 0] = centripetal_force[i, 1]/np.linalg.norm(centripetal_force[i])
+    v[i, 0] = centripetal_force[i, 1] / np.linalg.norm(centripetal_force[i])
     v[i, 0] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i])/m[i])
-    v[i, 1] = centripetal_force[i, 0]/np.linalg.norm(centripetal_force[i])
+                       * np.linalg.norm(distance_to_center[i]) / m[i])
+    v[i, 1] = centripetal_force[i, 0] / np.linalg.norm(centripetal_force[i])
     v[i, 1] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i])/m[i])
+                       * np.linalg.norm(distance_to_center[i]) / m[i])
 
 
 pygame.init()
@@ -102,6 +102,7 @@ textRect = text.get_rect()
 pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
 
 delay = 0
+bla, ble = float("-inf"), float("inf")
 while True:
     redraw = False
     for event in pygame.event.get():
@@ -123,6 +124,25 @@ while True:
             # Swap position and velocities
             p, p2 = p2, p
             v, v2 = v2, v
+
+            #pairshape = [m.shape[0], m.shape[0]]
+            # pairmask = np.ones(
+            #    pairshape+[1], dtype=np.int) - np.eye(m.shape[0], dtype=np.int)[..., np.newaxis]
+            Ug = 0
+            for i in range(m.shape[0]):
+                for j in range(m.shape[0]):
+                    if i != j:
+                        Ug -= G*(m[i] * m[j])/np.linalg.norm(p[i]-p[j])
+
+            Uv = np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2)
+            # Ug = np.sum(-G*(m.view()[np.newaxis, :, :] * m.view()[:, np.newaxis, :])[
+            #            pairmask]/(p.view()[np.newaxis, :, :]-p.view()[:, np.newaxis, :])[pairmask])
+
+            # bla = max(
+            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), bla)
+            # ble = min(
+            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), ble)
+            print(Uv+Ug, Uv, Ug)
         # end if
     # end for
 

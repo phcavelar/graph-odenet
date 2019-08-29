@@ -93,7 +93,28 @@ elif V_INIT_TYPE == "circular":
         v[i] *= velocity_magnitude
         print(velocity_magnitude)
 elif V_INIT_TYPE == "elliptical":
-    raise NotImplementedError("Not done yet")
+    # Set up the sun
+    p[0, :] = [0, 0]
+    m[0, :] = [100]
+    r[0, :] = np.log2(m[0,:])
+    c[0, :] = [255, 255, 0]
+    
+    center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
+    distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
+    _, _, centripetal_force = nbody(TIME_DELTA, p, v, m, G=G)
+    for i in range(NUM_OF_BODIES):
+        u_force = centripetal_force[i] / np.linalg.norm(centripetal_force[i])
+        velocity_magnitude = np.sqrt(np.linalg.norm(centripetal_force[i])
+                             * np.linalg.norm(distance_to_center[i]) / m[i])
+        if np.random.choice(["clockwise","counterclockwise"]) == "clockwise":
+            v[i, 0] = u_force[1]
+            v[i, 1] = -u_force[0]
+        else:
+            v[i, 0] = -u_force[1]
+            v[i, 1] = u_force[0]
+        
+        v[i] *= velocity_magnitude * 1.5
+        print(velocity_magnitude)
 else:
     raise NotImplementedError("No such velocity initilization \"{}\"".format(V_INIT_TYPE))
 
@@ -168,7 +189,7 @@ while True:
             avg_p = p[0]
         max_p = np.max(np.linalg.norm(p-avg_p[np.newaxis,:],axis=1))
         radius = max(1.5*max_p,radius)
-        radius = 1.5*max_p # Uncomment for trippier visualisation
+        #radius = 1.5*max_p # Uncomment for trippier visualisation
         if HEIGHT<WIDTH:
             h = 2*radius
             w = h*WIDTH/HEIGHT

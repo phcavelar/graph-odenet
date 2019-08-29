@@ -9,6 +9,8 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (109, 196, 255)
 
+FLOAT_DTYPE = np.float
+
 G = 39.478#6.67408e-11
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
@@ -49,18 +51,18 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
 
 num_dims = 2
 
-v = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
+v = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
+v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 p2 = np.random.uniform(low=10,
                        high=100, size=(NUM_OF_BODIES, num_dims))
-p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES)
-p = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
+p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES).astype(FLOAT_DTYPE)
+p = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 p[:, 0] = p2[:, 0] * np.cos(p2[:, 1])
 p[:, 1] = p2[:, 0] * np.sin(p2[:, 1])
 
-m = np.random.uniform(0.02, 9, size=(NUM_OF_BODIES, 1))
-f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=np.float)
+m = np.random.uniform(0.02, 9, size=(NUM_OF_BODIES, 1)).astype(FLOAT_DTYPE)
+f = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
+d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 
 # Configure color
 c = np.random.randint(64, 255, size=(NUM_OF_BODIES, 3))
@@ -68,7 +70,7 @@ c = np.random.randint(64, 255, size=(NUM_OF_BODIES, 3))
 r = np.log2(10*m)
 
 if V_INIT_TYPE == "random":
-    v = np.random.uniform(low=-3, high=3, size=(NUM_OF_BODIES,num_dims))
+    v = np.random.uniform(low=-3, high=3, size=(NUM_OF_BODIES,num_dims)).astype(FLOAT_DTYPE)
 elif V_INIT_TYPE == "circular":
     # Set up the sun
     p[0, :] = [0, 0]
@@ -118,7 +120,7 @@ elif V_INIT_TYPE == "elliptical":
 else:
     raise NotImplementedError("No such velocity initilization \"{}\"".format(V_INIT_TYPE))
 
-hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
+hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 hp[:] = p
 
 pygame.init()

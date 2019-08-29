@@ -14,11 +14,13 @@ COLOR_BLUE = (109, 196, 255)
 G = 39.478
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
-NUM_OF_BODIES = 2
+NUM_OF_BODIES = 6
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
 WIDTH = 1620
 HEIGHT = 1080
+
+V_INIT_TYPE = "circular" # One of: ["random", "circular", "elliptical"]
 
 
 def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
@@ -52,14 +54,14 @@ num_dims = 2
 v = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 p2 = np.random.uniform(low=min(WIDTH, HEIGHT)*1/7,
-                       high=min(WIDTH, HEIGHT)*1/4, size=(NUM_OF_BODIES, num_dims))
+                       high=min(WIDTH, HEIGHT)*1/3, size=(NUM_OF_BODIES, num_dims))
 p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES)
 p = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 p[:] = np.array([WIDTH/2, HEIGHT/2])
 p[:, 0] += p2[:, 0] * np.cos(p2[:, 1])
 p[:, 1] += p2[:, 0] * np.sin(p2[:, 1])
 
-m = np.random.uniform(2, 5, size=(NUM_OF_BODIES, 1))
+m = np.random.uniform(2, 12, size=(NUM_OF_BODIES, 1))
 f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=np.float)
 
@@ -74,22 +76,41 @@ c[0, :] = [255, 255, 0]
 print("pol", p2.shape, p2)
 print("car", p.shape, p)
 
-r = np.log2(m**2)
+r = 2*np.log2(m)
 r[1:] *= 3
 
 hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
 hp[:] = p
 
-center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
-distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
-_, _, centripetal_force = nbody(TIME_DELTA, p, v, m)
-for i in range(NUM_OF_BODIES):
-    v[i, 0] = centripetal_force[i, 1] / np.linalg.norm(centripetal_force[i])
-    v[i, 0] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i]) / m[i])
-    v[i, 1] = centripetal_force[i, 0] / np.linalg.norm(centripetal_force[i])
-    v[i, 1] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i]) / m[i])
+if V_INIT_TYPE == "random":
+    angle = np.random.uniform(low=0,
+                       high=2*np.pi, size=(NUM_OF_BODIES))
+    magnitude = np.random.uniform(low=80,
+                       high=120, size=(NUM_OF_BODIES))
+    v[1:,0] = magnitude[1:] * np.cos(angle[1:])
+    v[1:,1] = magnitude[1:] * np.sin(angle[1:])
+elif V_INIT_TYPE == "circular":
+    center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
+    distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
+    _, _, centripetal_force = nbody(TIME_DELTA, p, v, m)
+    for i in range(NUM_OF_BODIES):
+        u_force = centripetal_force[i] / np.linalg.norm(centripetal_force[i])
+        velocity_magnitude = np.sqrt(np.linalg.norm(centripetal_force[i])
+                             * np.linalg.norm(distance_to_center[i]) / m[i])
+        if np.random.choice(["clockwise","counterclockwise"]) == "clockwise":
+            v[i, 0] = u_force[1]
+            v[i, 1] = -u_force[0]
+        else:
+            v[i, 0] = -u_force[1]
+            v[i, 1] = u_force[0]
+        
+        v[i] *= velocity_magnitude
+        print(velocity_magnitude)
+elif V_INIT_TYPE == "elliptical":
+    raise NotImplementedError("Not done yet")
+else:
+    raise NotImplementedError("No such velocity initilization \"{}\"".format(V_INIT_TYPE))
+
 
 
 pygame.init()
@@ -131,7 +152,7 @@ while True:
             Uv = np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2)
             U = Uv+Ug
             Umax, Umin = max(Umax,U), min(Umin,U)
-            print(Umin,Umax,U, Uv, Ug)
+            #print(Umin,Umax,U, Uv, Ug)
         # end if
     # end for
 

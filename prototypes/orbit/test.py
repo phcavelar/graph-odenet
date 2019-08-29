@@ -22,7 +22,7 @@ V_INIT_TYPE = "random" # One of: ["random", "circular", "elliptical"]
 
 
 def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
-          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-6):
+          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-3):
     out_pos, out_vel, force_placeholder = map(lambda x: np.empty_like(
         pos) if x is None else x, (out_pos, out_vel, force_placeholder))
 
@@ -167,12 +167,13 @@ while True:
         if V_INIT_TYPE == "circular" or V_INIT_TYPE == "elliptical":
             avg_p = p[0]
         max_p = np.max(np.linalg.norm(p-avg_p[np.newaxis,:],axis=1))
-        radius = max(3*max_p,radius)
+        radius = max(1.5*max_p,radius)
+        radius = 1.5*max_p # Uncomment for trippier visualisation
         if HEIGHT<WIDTH:
-            h = radius
+            h = 2*radius
             w = h*WIDTH/HEIGHT
         else:
-            w = radius
+            w = 2*radius
             h = w*HEIGHT/WIDTH
 
         screen.fill(COLOR_BLACK)

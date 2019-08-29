@@ -12,14 +12,15 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (109, 196, 255)
 
-HIST_TIMESTEPS = 50
-TIMESTEP_DELAY = 3
-NUM_OF_BODIES = 5
+HIST_TIMESTEPS = 100
+TIMESTEP_DELAY = 1
+NUM_OF_BODIES = 15
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
-WIDTH = 1620
+WIDTH = 1920
 HEIGHT = 1080
-WALL_FRACTION = 1/7
+WALL_FRACTION = 1/12
+FONT_SIZE = 32
 
 
 def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None,
@@ -91,12 +92,10 @@ p = np.random.uniform(low=min(WIDTH, HEIGHT) * WALL_FRACTION,
                       high=min(WIDTH, HEIGHT) * (1 - WALL_FRACTION), size=(NUM_OF_BODIES, num_dims))
 p2 = np.copy(p)
 
-m = np.random.uniform(40, 80, size=(NUM_OF_BODIES, 1))
+r = m = np.random.uniform(5, 50, size=(NUM_OF_BODIES, 1))
 f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
 collision = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
-r = np.log2(m**2)
-r = np.random.uniform(50, 80, size=(NUM_OF_BODIES, 1))
 
 # Configure color
 c = np.random.randint(0, 255, size=(NUM_OF_BODIES, 3))

@@ -113,7 +113,7 @@ delay = 0
 while True:
     redraw = False
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             sys.exit()
         if event.type == TIME_EVENT_ID:
             redraw = True

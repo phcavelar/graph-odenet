@@ -105,7 +105,7 @@ hp = np.empty((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
 hp[:] = np.nan
 
 pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT,))
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
 pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
 

@@ -178,20 +178,15 @@ while True:
         screen.fill(COLOR_BLACK)
         for t in range(HIST_TIMESTEPS):
             for i in range(NUM_OF_BODIES):
+                if not (np.isnan(hp[t, i])).any():
                 pygame.gfxdraw.filled_circle(
                     screen,
-                    int(WIDTH/2+(hp[t, i, 0]-avg_p[0])*WIDTH/w),
-                    int(HEIGHT/2+(hp[t, i, 1]-avg_p[1])*HEIGHT/h),
-                    int(r[i, 0]*min(WIDTH,HEIGHT)/radius),
+                        int(WIDTH/2 + (hp[t, i, 0] - avg_p[0]) * WIDTH/w),
+                        int(HEIGHT/2 + (hp[t, i, 1]-avg_p[1]) * HEIGHT/h),
+                        int(r[i, 0] * min(WIDTH, HEIGHT) / radius),
                     list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                 )
-
-                # Draw Solid circles without alpha
-                # pygame.draw.circle(
-                #        screen,
-                #        list(c[i]) + [255/(HIST_TIMESTEPS-t)],
-                #        list(map(int,(hp[t,i,0], hp[t,i,1]))),
-                #        int(r[i])
-                # )
+            # end for
         # end for
+
         pygame.display.flip()

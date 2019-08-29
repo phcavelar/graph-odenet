@@ -154,13 +154,6 @@ while True:
                         int(r[i, 0]),
                         list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                     )
-
-                    # Draw Solid circles without alpha
-                    # pygame.draw.circle(
-                    #        screen,
-                    #        list(c[i]) + [255/(HIST_TIMESTEPS-t)],
-                    #        list(map(int,(hp[t,i,0], hp[t,i,1]))),
-                    #        int(r[i])
-                    # )
+            # end for
         # end for
         pygame.display.flip()

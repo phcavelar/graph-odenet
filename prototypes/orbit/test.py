@@ -9,20 +9,20 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (109, 196, 255)
 
-# Multiply by a big constant, otherwise the bodies would not move given
-# the small value of the gravitational constant
-G = 39.478
+G = 39.478#6.67408e-11
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
-NUM_OF_BODIES = 5
+NUM_OF_BODIES = 6
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
 WIDTH = 1620
 HEIGHT = 1080
 
+V_INIT_TYPE = "random" # One of: ["random", "circular", "elliptical"]
+
 
 def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
-          force_placeholder=None, distance_placeholder=None, G=39.478):
+          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-6):
     out_pos, out_vel, force_placeholder = map(lambda x: np.empty_like(
         pos) if x is None else x, (out_pos, out_vel, force_placeholder))
 
@@ -40,7 +40,7 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
             if i != j:
                 force_placeholder[i] -= distance_placeholder[i, j, :] * \
                     (G * m[i] * m[j] /
-                     (np.linalg.norm(distance_placeholder[i, j, :]) ** 2))
+                     (epsilon + np.linalg.norm(distance_placeholder[i, j, :]) ** 2))
 
     out_vel = np.add(vel, force_placeholder / mass * dt, out=out_vel)
     out_pos = np.add(pos, (vel + (out_vel - vel) / 2) * dt, out=out_pos)
@@ -51,58 +51,65 @@ num_dims = 2
 
 v = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-p2 = np.random.uniform(low=min(WIDTH, HEIGHT)*1/7,
-                       high=min(WIDTH, HEIGHT)*1/4, size=(NUM_OF_BODIES, num_dims))
+p2 = np.random.uniform(low=10,
+                       high=100, size=(NUM_OF_BODIES, num_dims))
 p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES)
 p = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-p[:] = np.array([WIDTH/2, HEIGHT/2])
-p[:, 0] += p2[:, 0] * np.cos(p2[:, 1])
-p[:, 1] += p2[:, 0] * np.sin(p2[:, 1])
+p[:, 0] = p2[:, 0] * np.cos(p2[:, 1])
+p[:, 1] = p2[:, 0] * np.sin(p2[:, 1])
 
-m = np.random.uniform(2, 5, size=(NUM_OF_BODIES, 1))
+m = np.random.uniform(0.02, 9, size=(NUM_OF_BODIES, 1))
 f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
 d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=np.float)
 
 # Configure color
-c = np.random.randint(0, 255, size=(NUM_OF_BODIES, 3))
+c = np.random.randint(64, 255, size=(NUM_OF_BODIES, 3))
 
-# Set up the sun
-p[0, :] = [WIDTH/2, HEIGHT/2]
-m[0, :] = [np.sum(m[1:])/0.01]
-c[0, :] = [255, 255, 0]
+r = np.log2(10*m)
 
-print("pol", p2.shape, p2)
-print("car", p.shape, p)
-
-r = np.log2(m**2)
-r[1:] *= 3
+if V_INIT_TYPE == "random":
+    v = np.random.uniform(low=-3, high=3, size=(NUM_OF_BODIES,num_dims))
+elif V_INIT_TYPE == "circular":
+    # Set up the sun
+    p[0, :] = [0, 0]
+    m[0, :] = [100]
+    r[0, :] = np.log2(m[0,:])
+    c[0, :] = [255, 255, 0]
+    
+    center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
+    distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
+    _, _, centripetal_force = nbody(TIME_DELTA, p, v, m, G=G)
+    for i in range(NUM_OF_BODIES):
+        u_force = centripetal_force[i] / np.linalg.norm(centripetal_force[i])
+        velocity_magnitude = np.sqrt(np.linalg.norm(centripetal_force[i])
+                             * np.linalg.norm(distance_to_center[i]) / m[i])
+        if np.random.choice(["clockwise","counterclockwise"]) == "clockwise":
+            v[i, 0] = u_force[1]
+            v[i, 1] = -u_force[0]
+        else:
+            v[i, 0] = -u_force[1]
+            v[i, 1] = u_force[0]
+        
+        v[i] *= velocity_magnitude
+        print(velocity_magnitude)
+elif V_INIT_TYPE == "elliptical":
+    raise NotImplementedError("Not done yet")
+else:
+    raise NotImplementedError("No such velocity initilization \"{}\"".format(V_INIT_TYPE))
 
 hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
 hp[:] = p
-
-center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
-distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
-_, _, centripetal_force = nbody(TIME_DELTA, p, v, m)
-for i in range(NUM_OF_BODIES):
-    v[i, 0] = centripetal_force[i, 1] / np.linalg.norm(centripetal_force[i])
-    v[i, 0] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i]) / m[i])
-    v[i, 1] = centripetal_force[i, 0] / np.linalg.norm(centripetal_force[i])
-    v[i, 1] *= np.sqrt(np.linalg.norm(centripetal_force[i])
-                       * np.linalg.norm(distance_to_center[i]) / m[i])
-
 
 pygame.init()
 size = WIDTH, HEIGHT
 screen = pygame.display.set_mode(size)
 
-font = pygame.font.SysFont('Arial', 16)
-text = font.render('0', True, COLOR_BLUE)
-textRect = text.get_rect()
 pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
 
+radius = 0
 delay = 0
-bla, ble = float("-inf"), float("inf")
+Umax, Umin = float("-inf"), float("inf")
+passed_iter = 0
 while True:
     redraw = False
     for event in pygame.event.get():
@@ -118,31 +125,33 @@ while True:
                 out_pos=p2,
                 out_vel=v2,
                 force_placeholder=f,
-                distance_placeholder=d
+                distance_placeholder=d,
+                G=G
             )
 
             # Swap position and velocities
             p, p2 = p2, p
             v, v2 = v2, v
-
-            #pairshape = [m.shape[0], m.shape[0]]
-            # pairmask = np.ones(
-            #    pairshape+[1], dtype=np.int) - np.eye(m.shape[0], dtype=np.int)[..., np.newaxis]
+            
+            # Check for energy conservation
             Ug = 0
             for i in range(m.shape[0]):
                 for j in range(m.shape[0]):
                     if i != j:
-                        Ug -= G*(m[i] * m[j])/np.linalg.norm(p[i]-p[j])
-
+                        Ug -= G*(m[i,0] * m[j,0])/np.linalg.norm(p[i]-p[j])
             Uv = np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2)
-            # Ug = np.sum(-G*(m.view()[np.newaxis, :, :] * m.view()[:, np.newaxis, :])[
-            #            pairmask]/(p.view()[np.newaxis, :, :]-p.view()[:, np.newaxis, :])[pairmask])
-
-            # bla = max(
-            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), bla)
-            # ble = min(
-            #    np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2), ble)
-            print(Uv+Ug, Uv, Ug)
+            U = Uv+Ug
+            Umax, Umin = max(Umax,U), min(Umin,U)
+            passed_iter += 1
+            print("Egy U⊥ {Umin:.4e} U⊤ {Umax:.4e} ΔU {Udelta:.4e} U {U:.4e} Uv {Uv:.4e} Ug {Ug:.4e} T {T:.3f}".format(
+                    Umin=Umin,
+                    Umax=Umax,
+                    Udelta=Umax-Umin,
+                    U=U,
+                    Uv=Uv,
+                    Ug=Ug,
+                    T=passed_iter*TIME_DELTA
+                    ))
         # end if
     # end for
 
@@ -152,15 +161,28 @@ while True:
             for t in range(HIST_TIMESTEPS-1):
                 hp[t, :, :] = hp[t+1, :, :]
         hp[HIST_TIMESTEPS-1, :, :] = p[:, :]
+        
+        
+        avg_p = np.mean(p,axis=0)
+        if V_INIT_TYPE == "circular" or V_INIT_TYPE == "elliptical":
+            avg_p = p[0]
+        max_p = np.max(np.linalg.norm(p-avg_p[np.newaxis,:],axis=1))
+        radius = max(3*max_p,radius)
+        if HEIGHT<WIDTH:
+            h = radius
+            w = h*WIDTH/HEIGHT
+        else:
+            w = radius
+            h = w*HEIGHT/WIDTH
 
         screen.fill(COLOR_BLACK)
         for t in range(HIST_TIMESTEPS):
             for i in range(NUM_OF_BODIES):
                 pygame.gfxdraw.filled_circle(
                     screen,
-                    int(hp[t, i, 0]),
-                    int(hp[t, i, 1]),
-                    int(r[i, 0]),
+                    int(WIDTH/2+(hp[t, i, 0]-avg_p[0])*WIDTH/w),
+                    int(HEIGHT/2+(hp[t, i, 1]-avg_p[1])*HEIGHT/h),
+                    int(r[i, 0]*min(WIDTH,HEIGHT)/radius),
                     list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                 )
 

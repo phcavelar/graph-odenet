@@ -11,22 +11,37 @@ from pprint import pprint as pp
 COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (109, 196, 255)
+COLOR_GREY = (192, 192, 192)
 
-HIST_TIMESTEPS = 100
-TIMESTEP_DELAY = 1
-NUM_OF_BODIES = 15
+HIST_TIMESTEPS = 5
+TIMESTEP_DELAY = 2
+NUM_OF_BODIES = 9
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
-WIDTH = 1920
-HEIGHT = 1080
-WALL_FRACTION = 1/12
+WIDTH = 800
+HEIGHT = 600
+# np.random.uniform(10, 15, size=(2,))
+WALL_GAP = np.random.uniform(
+    0.333 * NUM_OF_BODIES, 1 * NUM_OF_BODIES, size=(2,))
+WALL_SIZE = (NUM_OF_BODIES + 0.1 - WALL_GAP) / 2
 FONT_SIZE = 32
+SCALE = 50
+
+RECTANGLES = [
+    pygame.Rect(0, 0, WALL_SIZE[0] * SCALE,
+                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
+    pygame.Rect(WALL_SIZE[0] * SCALE, (WALL_SIZE[1] + WALL_GAP[1]) * SCALE + 0.5, WALL_GAP[0] * SCALE + 1,
+                WALL_SIZE[1] * SCALE + 0.5),
+    pygame.Rect((WALL_SIZE[0] + WALL_GAP[0]) * SCALE, 0, WALL_SIZE[0] * SCALE,
+                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
+    pygame.Rect(WALL_SIZE[0] * SCALE, 0, (WALL_SIZE[0] + WALL_GAP[0]) * SCALE,
+                WALL_SIZE[1] * SCALE)
+]
 
 
-def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None,
-                force=None, distance=None):
-    collision, out_pos, out_vel, force = map(lambda x: np.empty_like(
-        pos) if x is None else x, (collision, out_pos, out_vel, force))
+def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None, distance=None):
+    collision, out_pos, out_vel = map(lambda x: np.empty_like(
+        pos) if x is None else x, (collision, out_pos, out_vel))
 
     n = pos.shape[0]
 
@@ -62,50 +77,54 @@ def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, ou
 
     # Wall collision
     for i in range(n):
-        if pos[i][0] - radii[i] < WIDTH * WALL_FRACTION:
-            pos[i][0] = WIDTH * WALL_FRACTION + radii[i] - \
-                (pos[i][0] - radii[i] - WIDTH * WALL_FRACTION)
+        if pos[i][0] - radii[i] < WALL_SIZE[0]:
+            pos[i][0] = 2 * WALL_SIZE[0] + 2 * radii[i] - pos[i][0]
             out_vel[i][0] *= -1
-        if pos[i][0] + radii[i] > WIDTH * (1 - WALL_FRACTION):
-            pos[i][0] = WIDTH * (1 - WALL_FRACTION) - radii[i] + \
-                (WIDTH * (1 - WALL_FRACTION) - pos[i][0] - radii[i])
+        if pos[i][0] + radii[i] > WALL_SIZE[0] + WALL_GAP[0]:
+            pos[i][0] = WALL_SIZE[0] + WALL_GAP[0] - radii[i] + \
+                (WALL_SIZE[0] + WALL_GAP[0] - pos[i][0] - radii[i])
             out_vel[i][0] *= -1
-        if pos[i][1] - radii[i] < HEIGHT * WALL_FRACTION:
-            pos[i][1] = HEIGHT * WALL_FRACTION + radii[i] - \
-                (pos[i][1] - radii[i] - HEIGHT * WALL_FRACTION)
+        if pos[i][1] - radii[i] < WALL_SIZE[1]:
+            pos[i][1] = 2 * WALL_SIZE[1] + 2 * radii[i] - pos[i][1]
             out_vel[i][1] *= -1
-        if pos[i][1] + radii[i] > HEIGHT * (1 - WALL_FRACTION):
-            pos[i][1] = HEIGHT * (1 - WALL_FRACTION) - radii[i] + \
-                (HEIGHT * (1 - WALL_FRACTION) - pos[i][1] - radii[i])
+        if pos[i][1] + radii[i] > WALL_SIZE[1] + WALL_GAP[1]:
+            pos[i][1] = WALL_SIZE[1] + WALL_GAP[1] - radii[i] + \
+                (WALL_SIZE[1] + WALL_GAP[1] - pos[i][1] - radii[i])
             out_vel[i][1] *= -1
 
     out_pos = np.add(pos, ((vel + out_vel) / 2) * dt, out=out_pos)
 
-    return out_pos, out_vel, force
+    return out_pos, out_vel
 
 
 num_dims = 2
 
-v = np.random.uniform(-250, 250, size=(NUM_OF_BODIES, num_dims))
+v = np.random.uniform(-5, 5, size=(NUM_OF_BODIES, num_dims))
 v2 = np.copy(v)
-p = np.random.uniform(low=min(WIDTH, HEIGHT) * WALL_FRACTION,
-                      high=min(WIDTH, HEIGHT) * (1 - WALL_FRACTION), size=(NUM_OF_BODIES, num_dims))
+p = np.empty((NUM_OF_BODIES, num_dims))
+for i in range(num_dims):
+    p[:, i] = np.random.uniform(
+        WALL_SIZE[i], WALL_SIZE[i] + WALL_GAP[i], size=(NUM_OF_BODIES, ))
 p2 = np.copy(p)
 
-r = m = np.random.uniform(5, 50, size=(NUM_OF_BODIES, 1))
-f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
+r = np.random.uniform(0.1, 0.3, size=(NUM_OF_BODIES, 1))
+m = np.random.uniform(0.75, 1.25, size=(NUM_OF_BODIES, 1))
 d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
 collision = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
 
 # Configure color
-c = np.random.randint(0, 255, size=(NUM_OF_BODIES, 3))
+c = np.empty((NUM_OF_BODIES, 3))
+c[:, 0] = np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+c[:, 1] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+c[:, 2] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
 
 # Configure history
 hp = np.empty((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
 hp[:] = np.nan
 
 pygame.init()
-screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+# screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
 
@@ -126,13 +145,14 @@ while True:
                 collision=collision,
                 out_pos=p2,
                 out_vel=v2,
-                force=f,
                 distance=d
             )
 
             # Swap position and velocities
             p, p2 = p2, p
             v, v2 = v2, v
+
+            # print(p)
         # end if
     # end for
 
@@ -149,11 +169,20 @@ while True:
                 if not (np.isnan(hp[t, i])).any():
                     pygame.gfxdraw.filled_circle(
                         screen,
-                        int(hp[t, i, 0]),
-                        int(hp[t, i, 1]),
-                        int(r[i, 0]),
+                        int(hp[t, i, 0] * SCALE),
+                        int(hp[t, i, 1] * SCALE),
+                        int(r[i, 0] * SCALE),
                         list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                     )
             # end for
         # end for
+
+        # Draw rectangles
+        for rect in RECTANGLES:
+            pygame.draw.rect(screen, COLOR_GREY, rect)
+
+        # Flip colorbuffer
         pygame.display.flip()
+
+        # Debug print
+        print(np.sum(np.squeeze(m) * (np.linalg.norm(v, axis=1) ** 2) / 2))

@@ -9,6 +9,8 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (109, 196, 255)
 
+FLOAT_DTYPE = np.float
+
 G = 39.478#6.67408e-11
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
@@ -22,7 +24,7 @@ V_INIT_TYPE = "random" # One of: ["random", "circular", "elliptical"]
 
 
 def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
-          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-6):
+          force_placeholder=None, distance_placeholder=None, G=39.478, epsilon=1e-3):
     out_pos, out_vel, force_placeholder = map(lambda x: np.empty_like(
         pos) if x is None else x, (out_pos, out_vel, force_placeholder))
 
@@ -49,18 +51,18 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
 
 num_dims = 2
 
-v = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
+v = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
+v2 = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 p2 = np.random.uniform(low=10,
                        high=100, size=(NUM_OF_BODIES, num_dims))
-p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES)
-p = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
+p2[:, 1] = np.random.uniform(low=0, high=2*np.pi, size=NUM_OF_BODIES).astype(FLOAT_DTYPE)
+p = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 p[:, 0] = p2[:, 0] * np.cos(p2[:, 1])
 p[:, 1] = p2[:, 0] * np.sin(p2[:, 1])
 
-m = np.random.uniform(0.02, 9, size=(NUM_OF_BODIES, 1))
-f = np.zeros((NUM_OF_BODIES, num_dims), dtype=np.float)
-d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=np.float)
+m = np.random.uniform(0.02, 9, size=(NUM_OF_BODIES, 1)).astype(FLOAT_DTYPE)
+f = np.zeros((NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
+d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 
 # Configure color
 c = np.random.randint(64, 255, size=(NUM_OF_BODIES, 3))
@@ -68,7 +70,7 @@ c = np.random.randint(64, 255, size=(NUM_OF_BODIES, 3))
 r = np.log2(10*m)
 
 if V_INIT_TYPE == "random":
-    v = np.random.uniform(low=-3, high=3, size=(NUM_OF_BODIES,num_dims))
+    v = np.random.uniform(low=-3, high=3, size=(NUM_OF_BODIES,num_dims)).astype(FLOAT_DTYPE)
 elif V_INIT_TYPE == "circular":
     # Set up the sun
     p[0, :] = [0, 0]
@@ -93,11 +95,32 @@ elif V_INIT_TYPE == "circular":
         v[i] *= velocity_magnitude
         print(velocity_magnitude)
 elif V_INIT_TYPE == "elliptical":
-    raise NotImplementedError("Not done yet")
+    # Set up the sun
+    p[0, :] = [0, 0]
+    m[0, :] = [100]
+    r[0, :] = np.log2(m[0,:])
+    c[0, :] = [255, 255, 0]
+    
+    center_of_mass = np.sum(p*m, axis=0)/np.sum(m)
+    distance_to_center = np.linalg.norm(p - center_of_mass, axis=1)
+    _, _, centripetal_force = nbody(TIME_DELTA, p, v, m, G=G)
+    for i in range(NUM_OF_BODIES):
+        u_force = centripetal_force[i] / np.linalg.norm(centripetal_force[i])
+        velocity_magnitude = np.sqrt(np.linalg.norm(centripetal_force[i])
+                             * np.linalg.norm(distance_to_center[i]) / m[i])
+        if np.random.choice(["clockwise","counterclockwise"]) == "clockwise":
+            v[i, 0] = u_force[1]
+            v[i, 1] = -u_force[0]
+        else:
+            v[i, 0] = -u_force[1]
+            v[i, 1] = u_force[0]
+        
+        v[i] *= velocity_magnitude * 1.5
+        print(velocity_magnitude)
 else:
     raise NotImplementedError("No such velocity initilization \"{}\"".format(V_INIT_TYPE))
 
-hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=np.float)
+hp = np.zeros((HIST_TIMESTEPS, NUM_OF_BODIES, num_dims), dtype=FLOAT_DTYPE)
 hp[:] = p
 
 pygame.init()
@@ -167,12 +190,13 @@ while True:
         if V_INIT_TYPE == "circular" or V_INIT_TYPE == "elliptical":
             avg_p = p[0]
         max_p = np.max(np.linalg.norm(p-avg_p[np.newaxis,:],axis=1))
-        radius = max(3*max_p,radius)
+        radius = max(1.5*max_p,radius)
+        #radius = 1.5*max_p # Uncomment for trippier visualisation
         if HEIGHT<WIDTH:
-            h = radius
+            h = 2*radius
             w = h*WIDTH/HEIGHT
         else:
-            w = radius
+            w = 2*radius
             h = w*HEIGHT/WIDTH
 
         screen.fill(COLOR_BLACK)

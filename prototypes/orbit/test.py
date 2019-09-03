@@ -19,7 +19,7 @@ COLOR_BLACK = (0, 0, 0)
 # Visualization constants
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
-DATA_FOLDER = './prototypes/balls/data/'
+DATA_FOLDER = './prototypes/orbit/data/'
 
 # Pygame Constants
 TIME_DELTA = 0.01

@@ -1,7 +1,9 @@
+# Core
 import sys
 import time
 import os
 
+# Manipulation + Draw + CLI
 import numpy as np
 import pygame
 import pygame.gfxdraw
@@ -11,39 +13,94 @@ from tqdm import trange, tqdm
 # Dev
 from pprint import pprint as pp
 
-COLOR_WHITE = (255, 255, 255)
+# Default colors
 COLOR_BLACK = (0, 0, 0)
-COLOR_BLUE = (109, 196, 255)
 COLOR_GREY = (192, 192, 192)
 
-NUM_DIMS = 2
+# Visualization constants
 HIST_TIMESTEPS = 5
 TIMESTEP_DELAY = 2
-NUM_OF_BODIES = 9
+DATA_FOLDER = './prototypes/balls/data/'
+
+# Pygame Constants
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
 WIDTH = 800
 HEIGHT = 600
-# np.random.uniform(10, 15, size=(2,))
+DRAW_SCALE = 50
+
+# Simulation "constants"
+NUM_DIMS = 2
+NUM_OF_BODIES = 9
 WALL_GAP = np.random.uniform(
     0.333 * NUM_OF_BODIES, 1 * NUM_OF_BODIES, size=(2,))
 WALL_SIZE = (NUM_OF_BODIES + 0.1 - WALL_GAP) / 2
-FONT_SIZE = 32
-SCALE = 50
-
 RECTANGLES = [
-    pygame.Rect(0, 0, WALL_SIZE[0] * SCALE,
-                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
-    pygame.Rect(WALL_SIZE[0] * SCALE, (WALL_SIZE[1] + WALL_GAP[1]) * SCALE + 0.5, WALL_GAP[0] * SCALE + 1,
-                WALL_SIZE[1] * SCALE + 0.5),
-    pygame.Rect((WALL_SIZE[0] + WALL_GAP[0]) * SCALE, 0, WALL_SIZE[0] * SCALE,
-                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
-    pygame.Rect(WALL_SIZE[0] * SCALE, 0, (WALL_SIZE[0] + WALL_GAP[0]) * SCALE,
-                WALL_SIZE[1] * SCALE)
+    pygame.Rect(0, 0, WALL_SIZE[0] * DRAW_SCALE,
+                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * DRAW_SCALE),
+    pygame.Rect(WALL_SIZE[0] * DRAW_SCALE, (WALL_SIZE[1] + WALL_GAP[1]) * DRAW_SCALE + 0.5, WALL_GAP[0] * DRAW_SCALE + 1,
+                WALL_SIZE[1] * DRAW_SCALE + 0.5),
+    pygame.Rect((WALL_SIZE[0] + WALL_GAP[0]) * DRAW_SCALE, 0, WALL_SIZE[0] * DRAW_SCALE,
+                (WALL_SIZE[1] * 2 + WALL_GAP[1]) * DRAW_SCALE),
+    pygame.Rect(WALL_SIZE[0] * DRAW_SCALE, 0, (WALL_SIZE[0] + WALL_GAP[0]) * DRAW_SCALE,
+                WALL_SIZE[1] * DRAW_SCALE)
 ]
 
 
+def reset_environment():
+    """
+    Reset the WALL_GAP, WALL_SIZE and RECTANGLES
+    variables, to a new random value
+    """
+    global WALL_GAP, WALL_SIZE, RECTANGLES
+
+    WALL_GAP = np.random.uniform(
+        0.333 * NUM_OF_BODIES, 1 * NUM_OF_BODIES, size=(2,))
+    WALL_SIZE = (NUM_OF_BODIES + 0.1 - WALL_GAP) / 2
+
+    RECTANGLES = [
+        pygame.Rect(0, 0, WALL_SIZE[0] * DRAW_SCALE,
+                    (WALL_SIZE[1] * 2 + WALL_GAP[1]) * DRAW_SCALE),
+        pygame.Rect(WALL_SIZE[0] * DRAW_SCALE, (WALL_SIZE[1] + WALL_GAP[1]) * DRAW_SCALE + 0.5, WALL_GAP[0] * DRAW_SCALE + 1,
+                    WALL_SIZE[1] * DRAW_SCALE + 0.5),
+        pygame.Rect((WALL_SIZE[0] + WALL_GAP[0]) * DRAW_SCALE, 0, WALL_SIZE[0] * DRAW_SCALE,
+                    (WALL_SIZE[1] * 2 + WALL_GAP[1]) * DRAW_SCALE),
+        pygame.Rect(WALL_SIZE[0] * DRAW_SCALE, 0, (WALL_SIZE[0] + WALL_GAP[0]) * DRAW_SCALE,
+                    WALL_SIZE[1] * DRAW_SCALE)
+    ]
+
+
+def generate_initial_values():
+    """
+    Generate the new physical values used in the simulation
+    """
+    v = np.random.uniform(-5, 5, size=(NUM_OF_BODIES, NUM_DIMS))
+    v2 = np.copy(v)
+    p = np.empty((NUM_OF_BODIES, NUM_DIMS))
+    for i in range(NUM_DIMS):
+        p[:, i] = np.random.uniform(
+            WALL_SIZE[i], WALL_SIZE[i] + WALL_GAP[i], size=(NUM_OF_BODIES, ))
+    p2 = np.copy(p)
+
+    r = np.random.uniform(0.1, 0.3, size=(NUM_OF_BODIES, 1))
+    m = np.random.uniform(0.75, 1.25, size=(NUM_OF_BODIES, 1))
+    d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
+    collision = np.zeros(
+        (NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
+
+    # Configure color
+    c = np.empty((NUM_OF_BODIES, 3))
+    c[:, 0] = np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+    c[:, 1] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+    c[:, 2] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+
+    return v, v2, p, p2, r, m, d, c, collision
+
+
 def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None, distance=None, save_data=False):
+    """
+    Compute the physical interaction between n-many balls
+    """
     collision, out_pos, out_vel = map(lambda x: np.empty_like(
         pos) if x is None else x, (collision, out_pos, out_vel))
 
@@ -101,62 +158,29 @@ def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, ou
     return out_pos
 
 
-DATA_FOLDER = './prototypes/balls/data/'
-
-
 def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2000):
-    global WALL_GAP, WALL_SIZE, RECTANGLES
-
+    """
+    Run the simulation for `num_scenes` with `num_timesteps` each scene.
+    Properly resets the environment and the physical values each scene.
+    """
     # Run simulation
     for curr_scene in trange(num_scenes, desc="Scene"):
-        curr_timestep = 0  # Zero the curr_timestep
-
         # Reset the environment
-        WALL_GAP = np.random.uniform(
-            0.333 * NUM_OF_BODIES, 1 * NUM_OF_BODIES, size=(2,))
-        WALL_SIZE = (NUM_OF_BODIES + 0.1 - WALL_GAP) / 2
+        reset_environment()
 
-        RECTANGLES = [
-            pygame.Rect(0, 0, WALL_SIZE[0] * SCALE,
-                        (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
-            pygame.Rect(WALL_SIZE[0] * SCALE, (WALL_SIZE[1] + WALL_GAP[1]) * SCALE + 0.5, WALL_GAP[0] * SCALE + 1,
-                        WALL_SIZE[1] * SCALE + 0.5),
-            pygame.Rect((WALL_SIZE[0] + WALL_GAP[0]) * SCALE, 0, WALL_SIZE[0] * SCALE,
-                        (WALL_SIZE[1] * 2 + WALL_GAP[1]) * SCALE),
-            pygame.Rect(WALL_SIZE[0] * SCALE, 0, (WALL_SIZE[0] + WALL_GAP[0]) * SCALE,
-                        WALL_SIZE[1] * SCALE)
-        ]
-
+        # Create save_data folder
         if save_data:
-            # Create folder
             os.mkdir("{}/{}".format(DATA_FOLDER, curr_scene))
 
-        # Create numpy values
-        v = np.random.uniform(-5, 5, size=(NUM_OF_BODIES, NUM_DIMS))
-        v2 = np.copy(v)
-        p = np.empty((NUM_OF_BODIES, NUM_DIMS))
-        for i in range(NUM_DIMS):
-            p[:, i] = np.random.uniform(
-                WALL_SIZE[i], WALL_SIZE[i] + WALL_GAP[i], size=(NUM_OF_BODIES, ))
-        p2 = np.copy(p)
-
-        r = np.random.uniform(0.1, 0.3, size=(NUM_OF_BODIES, 1))
-        m = np.random.uniform(0.75, 1.25, size=(NUM_OF_BODIES, 1))
-        d = np.zeros((NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
-        collision = np.zeros(
-            (NUM_OF_BODIES, NUM_OF_BODIES), dtype=np.float)
-
-        # Configure color
-        c = np.empty((NUM_OF_BODIES, 3))
-        c[:, 0] = np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
-        c[:, 1] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
-        c[:, 2] = 255 - np.interp(m, [0.75, 1.25], [0, 255]).squeeze()
+        # Generate values
+        v, v2, p, p2, r, m, d, c, collision = generate_initial_values()
 
         # Configure history
         hp = np.empty((HIST_TIMESTEPS, NUM_OF_BODIES,
                        NUM_DIMS), dtype=np.float)
         hp[:] = np.nan
 
+        # Configure pyGame canvas
         if draw:
             pygame.init()
             # screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -166,6 +190,7 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
 
             delay = 0
 
+        # Run this scene for max_timesteps steps
         for curr_timestep in trange(max_timesteps, desc="Timestep"):
             if draw:
                 redraw = False
@@ -191,39 +216,40 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                             p, p2 = p2, p
                             v, v2 = v2, v
 
-                            # End the loop, to be able to redraw the game
+                            # End the loop, to be able to redraw the simulation
                             redraw = True
                         # end if
                     # end for
 
-                if redraw:
-                    delay = (delay + 1) % TIMESTEP_DELAY
-                    if not delay:
-                        for t in range(HIST_TIMESTEPS-1):
-                            hp[t, :, :] = hp[t+1, :, :]
-                    hp[HIST_TIMESTEPS-1, :, :] = p[:, :]
+                # Update the timesteps
+                delay = (delay + 1) % TIMESTEP_DELAY
+                if not delay:
+                    for t in range(HIST_TIMESTEPS-1):
+                        hp[t, :, :] = hp[t+1, :, :]
+                hp[HIST_TIMESTEPS-1, :, :] = p[:, :]
 
-                    screen.fill(COLOR_BLACK)
-                    for t in range(HIST_TIMESTEPS):
-                        for i in range(NUM_OF_BODIES):
-                            if not (np.isnan(hp[t, i])).any():
-                                pygame.gfxdraw.filled_circle(
-                                    screen,
-                                    int(hp[t, i, 0] * SCALE),
-                                    int(hp[t, i, 1] * SCALE),
-                                    int(r[i, 0] * SCALE),
-                                    list(c[i]) +
-                                    [255 // (HIST_TIMESTEPS-t)]
-                                )
-                        # end for
+                # Redraw the balls in the simulation
+                screen.fill(COLOR_BLACK)
+                for t in range(HIST_TIMESTEPS):
+                    for i in range(NUM_OF_BODIES):
+                        if not (np.isnan(hp[t, i])).any():
+                            pygame.gfxdraw.filled_circle(
+                                screen,
+                                int(hp[t, i, 0] * DRAW_SCALE),
+                                int(hp[t, i, 1] * DRAW_SCALE),
+                                int(r[i, 0] * DRAW_SCALE),
+                                list(c[i]) +
+                                [255 // (HIST_TIMESTEPS-t)]
+                            )
                     # end for
+                # end for
 
-                    # Draw rectangles
-                    for rect in RECTANGLES:
-                        pygame.draw.rect(screen, COLOR_GREY, rect)
+                # Draw rectangles
+                for rect in RECTANGLES:
+                    pygame.draw.rect(screen, COLOR_GREY, rect)
 
-                    # Flip colorbuffer
-                    pygame.display.flip()
+                # Flip colorbuffer
+                pygame.display.flip()
             else:
                 if save_data:
                     np.save(DATA_FOLDER + str(curr_scene) + "/" +

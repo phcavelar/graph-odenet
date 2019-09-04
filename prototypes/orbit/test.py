@@ -141,8 +141,9 @@ def run_simulation(draw=False, save_data=False, start_at=0, num_scenes=500, max_
     Properly resets the environment and the physical values each scene.
     """
 
-    global NUM_OF_BODIES
+    global NUM_OF_BODIES, DATA_FOLDER
     NUM_OF_BODIES = num_of_bodies
+    DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
     # Run num_scenes simulations
     for curr_scene in trange(start_at, start_at + num_scenes, desc="Scene"):

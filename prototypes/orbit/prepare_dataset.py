@@ -19,7 +19,6 @@ def read_instance(data_folder, simulation):
             var=fname
         ))
     # end for
-
     return i
 # end read_instance
 
@@ -56,12 +55,64 @@ def process_instance(instance, timestep):
     return Oin, Oout, Msrc, Mtgt
 # end process_instance
 
-# TODO Read processed instance from "dataset"
-# TODO Make batch with block-diagonal matrix (How to make src and tgt matrix is in process_instance)
-# TODO Make batch loader
+def get_epoch(dataset_folder,batch_size=100):
+    dataset_files = [x for x in os.listdir(dataset_folder) if ".git" not in x]
+    np.random.shuffle(dataset_files)
+    for batch in gen_batch(dataset_files, batch_size=batch_size):
+        yield batch
+    #end for
+#end get_epoch
 
+def read_processed_instance(instance):
+    Omerged = np.load(instance)
+    return Omerged[0], Omerged[1]
+#end read_processeed instance
 
-def prepare_dataset(num_of_bodies=3):
+def gen_batch(file_iterator, batch_size=100):
+    batch=[]
+    for f in file_iterator:
+        batch.append(read_processed_instance(f))
+        if len(batch)>=batch_size:
+            yield merge_instances(batch)
+            batch=[]
+    yield merge_instances(batch)
+#end gen_batch
+
+def merge_instances(batch):
+    batch_n = sum( (Oin.shape[0] for Oin, Oout in batch) )
+    batch_m = sum( (Oin.shape[0]*Oin.shape[0]-Oin.shape[0] for Oin, Oout in batch) )
+    float_dtype = batch[0][0].dtype
+    O_shape = batch[0][0].shape[-1]
+    bOin = np.zeros([batch_n,O_shape], float_dtype)
+    bOout = np.zeros([batch_n,O_shape], float_dtype)
+    bMsrc = np.zeros([batch_n,batch_m], float_dtype)
+    bMtgt = np.zeros([batch_n,batch_m], float_dtype)
+    n_list = []
+    m_list = []
+    n_acc = 0
+    m_acc = 0
+    for Oin, Oout in batch:
+        n = Oin.shape[0]
+        
+        BOin[n_acc:n_acc+n,:] = Oin[:,:]
+        BOout[n_acc:n_acc+n,:] = Oout[:,:]
+        
+        Adj_matrix = np.ones([n, n]) - np.eye(n)
+        relations = [(src, tgt) for src in range(n)
+                     for tgt in range(n) if Adj_matrix[src, tgt] != 0]
+
+        m = len(relations)
+        for r, (s, t) in enumerate(relations):
+            bMsrc[n+s, m+r] = 1
+            bMtgt[n+t, m+r] = 1
+        #end for
+        n_list.append(n)
+        m_list.append(m)
+    #end for
+    return bOin, bOout, bMsrc, bMtgt, n_list, m_list
+#end merge_instances
+
+def prepare_dataset(num_of_bodies=6):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     MAX_TSTEP = 1000
@@ -108,14 +159,14 @@ def prepare_dataset(num_of_bodies=3):
         (2*((x-value_percentiles[1])/(value_percentiles[2]-value_percentiles[0])))-1)
 
     np.save(
-        "{}/{}/normvals.np".format(DATASET_FOLDER, fold), value_percentiles
+        "{}/{}/normvals.npy".format(DATASET_FOLDER, fold), value_percentiles
     )
 
     instances = [(sim, t) for sim in simulations for t in range(MAX_TSTEP-1)]
     n_train = int(len(instances)*NUM_TRAIN_INSTANCES)
     n_validation = int(len(instances)*NUM_VALIDATION_INSTANCES)
     n_test = int(len(instances)*NUM_TEST_INSTANCES)
-    for fold in tqdm.tqdm(simulations, desc="Fold"):
+    for fold in tqdm.trange(NUM_FOLDS, desc="Fold"):
         fold_instances = np.random.choice(
             len(instances), n_train + n_validation + n_test, replace=False)
         train = fold_instances[:n_train]
@@ -132,7 +183,7 @@ def prepare_dataset(num_of_bodies=3):
                 Omerged = np.append(
                     Oin[np.newaxis, ...], Oout[np.newaxis, ...], axis=0)
                 np.save(
-                    "{}/{}/{}/{}.np".format(DATASET_FOLDER,
+                    "{}/{}/{}/{}.npy".format(DATASET_FOLDER,
                                             fold, s, i), Omerged
                 )
             # end

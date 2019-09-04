@@ -1,12 +1,16 @@
 import os
+import tqdm
 
 from pprint import pprint as pp
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 import numpy as np
+
+from prepare_dataset import get_epoch
 
 from model import IN, IN_ODE
 
@@ -67,25 +71,48 @@ def process_instance(instance):
 # TODO Make training schedule as in the paper
 # TODO Train and test for the 10 folds
 if __name__ == "__main__":
-    DATA_FOLDER = "./data"
-    MAX_TSTEP = 1000
+    DATASET_FOLDER = "./dataset/6"
+    NUM_FOLDS = 10
+    NUM_EPOCHS = 2000
+    BATCH_SIZE = 100
+    TRAIN_SIZE = 999000
+    O_SHAPE = 5
+    LEARNING_RATE = 0.001
+    LR_DECAY = 0.8
+    LR_DECAY_WINDOW = 40
+    L2_NORM = 5e-4 # Not provided in paper, took from our other experiments
+    PREDICTED_VALUES = 2 # vx, vy
     Model = IN
 
-    simulations = sorted(
-        [x for x in os.listdir(DATA_FOLDER) if x != ".gitkeep"])
-    inputs = [(sim, t) for t in range(MAX_TSTEP-1) for sim in simulations]
-
-    chosen = np.random.choice(len(inputs))
-    inst = read_instance(DATA_FOLDER, *inputs[chosen])
-    pp(inst)
-
-    Oin, Oout, Msrc, Mtgt = map(lambda x: x.astype(
-        np.float32), process_instance(inst))
-
-    for n, o in zip(["Oin", "Oout", "Msrc", "Mtgt"], [Oin, Oout, Msrc, Mtgt]):
-        print(n, o.shape, o[0])
-
-    model = Model(Oin.shape[1], 0, 0, 2)
-    y = model(torch.tensor(Oin), None, None,
-              torch.tensor(Msrc), torch.tensor(Mtgt))
-    print(y)
+    for fold in tqdm.trange(NUM_FOLDS, desc="Fold"):    
+        current_lr = LEARNING_RATE
+        model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
+        optimizer = optim.Adam(model.parameters(),
+                           lr=current_lr, weight_decay=L2_NORM)
+        for epoch in tqdm.trange(NUM_EPOCHS, desc="Epoch"):
+            model.train()
+            for b, batch in tqdm.tqdm(get_epoch("{}/{}/train".format(DATASET_FOLDER,fold),BATCH_SIZE), total=TRAIN_SIZE/BATCH_SIZE, desc="Batch Train"):
+                bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
+                Pred = model(bOin, None, None, bMsrc, bMtgt)
+                optimizer.zero_grad()
+                loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
+                loss.backward()
+                optimizer.step()
+                tqdm.write(loss)
+            #end for
+            
+            model.eval()
+            val_loss = []
+            for b, batch in tqdm.tqdm(get_epoch("{}/{}/validation".format(DATASET_FOLDER,fold),BATCH_SIZE), total=TRAIN_SIZE/BATCH_SIZE, desc="Batch Valid"):
+                bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
+                with torch.no_grad():
+                    Pred = model(bOin, None, None, bMsrc, bMtgt)
+                    loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
+                #end with
+                val_loss.append(loss)
+            #end for
+            
+            val_loss = np.mean(val_loss)
+            tqdm.write(val_loss)
+        #end for
+    #end for

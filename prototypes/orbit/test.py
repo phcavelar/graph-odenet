@@ -172,6 +172,15 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
             radius = 0
             # Umax, Umin, passed_iter = float("-inf"), float("inf"), 0
 
+        # Generate placeholders
+        all_p, all_v, all_m, all_r, all_f, all_data = np.zeros(
+            [max_timesteps, *p.shape]), np.zeros(
+            [max_timesteps, *v.shape]), np.zeros(
+            [max_timesteps, *m.shape]), np.zeros(
+            [max_timesteps, *r.shape]), np.zeros(
+            [max_timesteps, *f.shape]), np.zeros(
+            [max_timesteps, 1])
+
         # Run this scene for max_timesteps steps
         for curr_timestep in trange(max_timesteps, desc="Timestep"):
             if draw:
@@ -181,6 +190,10 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                         if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                             sys.exit()
                         if event.type == TIME_EVENT_ID:
+                            if save_data:
+                                for all_x, x in zip([all_p, all_v, all_m, all_r, all_f, all_data], [p, v, m, r, f, np.array([G])]):
+                                    all_x[curr_timestep] = x.copy()
+
                             nbody(
                                 TIME_DELTA,
                                 p,
@@ -267,18 +280,8 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                 pygame.display.flip()
             else:
                 if save_data:
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.pos.npy', p)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.vel.npy', v)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.mass.npy', m)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.radii.npy', r)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.force.npy', f)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.data.npy', np.array([G]))
+                    for all_x, x in zip([all_p, all_v, all_m, all_r, all_f, all_data], [p, v, m, r, f, np.array([G])]):
+                        all_x[curr_timestep] = x.copy()
 
                 nbody(
                     TIME_DELTA,
@@ -297,6 +300,19 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                 v, v2 = v2, v
             # end if
         # end for
+
+        # Save values
+        if save_data:
+            np.save("{}{}/pos.npy".format(DATA_FOLDER, str(curr_scene)), all_p)
+            np.save("{}{}/vel.npy".format(DATA_FOLDER, str(curr_scene)), all_v)
+            np.save("{}{}/mass.npy".format(
+                DATA_FOLDER, str(curr_scene)), all_m)
+            np.save("{}{}/radii.npy".format(
+                DATA_FOLDER, str(curr_scene)), all_r)
+            np.save("{}{}/force.npy".format(
+                DATA_FOLDER, str(curr_scene)), all_f)
+            np.save("{}{}/data.npy".format(
+                DATA_FOLDER, str(curr_scene)), all_data)
     # end for
 
 

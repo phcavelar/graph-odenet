@@ -56,7 +56,7 @@ def process_instance(instance, timestep):
 # end process_instance
 
 def get_epoch(dataset_folder,batch_size=100):
-    dataset_files = [x for x in os.listdir(dataset_folder) if ".git" not in x]
+    dataset_files = ["{}/{}".format(dataset_folder,x) for x in os.listdir(dataset_folder) if ".git" not in x]
     np.random.shuffle(dataset_files)
     for batch in gen_batch(dataset_files, batch_size=batch_size):
         yield batch
@@ -94,8 +94,8 @@ def merge_instances(batch):
     for Oin, Oout in batch:
         n = Oin.shape[0]
         
-        BOin[n_acc:n_acc+n,:] = Oin[:,:]
-        BOout[n_acc:n_acc+n,:] = Oout[:,:]
+        bOin[n_acc:n_acc+n,:] = Oin[:,:]
+        bOout[n_acc:n_acc+n,:] = Oout[:,:]
         
         Adj_matrix = np.ones([n, n]) - np.eye(n)
         relations = [(src, tgt) for src in range(n)

@@ -91,20 +91,20 @@ if __name__ == "__main__":
                            lr=current_lr, weight_decay=L2_NORM)
         for epoch in tqdm.trange(NUM_EPOCHS, desc="Epoch"):
             model.train()
-            for b, batch in tqdm.tqdm(get_epoch("{}/{}/train".format(DATASET_FOLDER,fold),BATCH_SIZE), total=TRAIN_SIZE/BATCH_SIZE, desc="Batch Train"):
-                bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
+            for b, batch in tqdm.tqdm(enumerate(get_epoch("{}/{}/train".format(DATASET_FOLDER,fold),BATCH_SIZE)), total=TRAIN_SIZE/BATCH_SIZE, desc="Batch Train"):
+                bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(lambda x: torch.tensor(x.astype(np.float32)) if not type(x) == list else torch.tensor(x,dtype=torch.float), batch)
                 Pred = model(bOin, None, None, bMsrc, bMtgt)
                 optimizer.zero_grad()
                 loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
                 loss.backward()
                 optimizer.step()
-                tqdm.write(loss)
+                tqdm.tqdm.write(str(loss))
             #end for
             
             model.eval()
             val_loss = []
-            for b, batch in tqdm.tqdm(get_epoch("{}/{}/validation".format(DATASET_FOLDER,fold),BATCH_SIZE), total=TRAIN_SIZE/BATCH_SIZE, desc="Batch Valid"):
-                bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
+            for b, batch in tqdm.tqdm(enumerate(get_epoch("{}/{}/validation".format(DATASET_FOLDER,fold),BATCH_SIZE)), desc="Batch Valid"):
+                bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(torch.tensor, batch)
                 with torch.no_grad():
                     Pred = model(bOin, None, None, bMsrc, bMtgt)
                     loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])

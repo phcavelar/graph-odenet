@@ -19,7 +19,7 @@ COLOR_BLACK = (0, 0, 0)
 # Visualization constants
 HIST_TIMESTEPS = 100
 TIMESTEP_DELAY = 2
-DATA_FOLDER = './prototypes/orbit/data/'
+DATA_FOLDER = './data'
 
 # Pygame Constants
 TIME_DELTA = 0.01
@@ -33,7 +33,6 @@ G = 39.478  # 6.67408e-11
 NUM_OF_BODIES = 6
 FLOAT_DTYPE = np.float
 SUN_INDEX = 0
-ORBIT_TYPE = "circular"  # One of: ["random", "circular", "elliptical"]
 
 
 def generate_initial_values():
@@ -64,18 +63,18 @@ def generate_initial_values():
     return v, v2, p, p2, m, f, d, c, r
 
 
-def compute_orbit(v, p, m, r, c):
+def compute_orbit(v, p, m, r, c, orbit_type):
     """
     Make the velocities to adjust to a given orbit_type
     """
 
     # Assert orbit_type is valid
-    if ORBIT_TYPE not in ["random", "circular", "elliptical"]:
+    if orbit_type not in ["random", "circular", "elliptical"]:
         raise NotImplementedError(
-            "No such orbit type: \"{}\"".format(ORBIT_TYPE))
+            "No such orbit type: \"{}\"".format(orbit_type))
 
     # Random calculation is easy
-    if ORBIT_TYPE == "random":
+    if orbit_type == "random":
         v = np.random.uniform(
             low=-3, high=3, size=(NUM_OF_BODIES, NUM_DIMS)).astype(FLOAT_DTYPE)
         return v, p, m, r, c
@@ -102,7 +101,7 @@ def compute_orbit(v, p, m, r, c):
             ["clockwise", "counterclockwise"]) == "clockwise" else -1
         v[i, 0] = u_force[1] * rotation
         v[i, 1] = -u_force[0] * rotation
-        v[i] *= velocity_magnitude * (1.5 if ORBIT_TYPE == "elliptical" else 1)
+        v[i] *= velocity_magnitude * (1.5 if orbit_type == "elliptical" else 1)
 
     return v, p, m, r, c
 
@@ -136,23 +135,23 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
     return out_pos, out_vel, force_placeholder
 
 
-def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2000):
+def run_simulation(draw=False, save_data=False, start=0, num_scenes=500, max_timesteps=2000, orbit_type="elliptical"):
     """
     Run the simulation for `num_scenes` with `num_timesteps` each scene.
     Properly resets the environment and the physical values each scene.
     """
 
     # Run num_scenes simulations
-    for curr_scene in trange(num_scenes, desc="Scene"):
+    for curr_scene in trange(start, start+num_scenes, desc="Scene"):
         # Create save_data folder
         if save_data:
-            os.mkdir("{}/{}".format(DATA_FOLDER, curr_scene))
+            os.makedirs("{}/{}".format(DATA_FOLDER, curr_scene), exist_ok=True)
 
         # Generate values
         v, v2, p, p2, m, f, d, c, r = generate_initial_values()
 
         # Compute the orbit
-        v, p, m, r, c = compute_orbit(v, p, m, r, c)
+        v, p, m, r, c = compute_orbit(v, p, m, r, c, orbit_type)
 
         # Configure history
         hp = np.empty((HIST_TIMESTEPS, NUM_OF_BODIES,
@@ -212,28 +211,6 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
 
                             # End the loop, to be able to redraw the simulation
                             redraw = True
-
-                            # Check for energy conservation
-                            # Ug = 0
-                            # for i in range(m.shape[0]):
-                            #     for j in range(m.shape[0]):
-                            #         if i != j:
-                            #             Ug -= G*(m[i, 0] * m[j, 0]) / \
-                            #                 np.linalg.norm(p[i]-p[j])
-                            # Uv = np.sum(np.squeeze(m) *
-                            #             (np.linalg.norm(v, axis=1) ** 2) / 2)
-                            # U = Uv+Ug
-                            # Umax, Umin = max(Umax, U), min(Umin, U)
-                            # passed_iter += 1
-                            # print("Egy U⊥ {Umin:.4e} U⊤ {Umax:.4e} ΔU {Udelta:.4e} U {U:.4e} Uv {Uv:.4e} Ug {Ug:.4e} T {T:.3f}".format(
-                            #     Umin=Umin,
-                            #     Umax=Umax,
-                            #     Udelta=Umax-Umin,
-                            #     U=U,
-                            #     Uv=Uv,
-                            #     Ug=Ug,
-                            #     T=passed_iter * TIME_DELTA
-                            # ))
                         # end if
                     # end for
                 # end while
@@ -247,7 +224,7 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
 
                 # Recompute the max_p and radius, used to configure zoom
                 avg_p = np.mean(p, axis=0)
-                if ORBIT_TYPE == "circular" or ORBIT_TYPE == "elliptical":
+                if orbit_type == "circular" or orbit_type == "elliptical":
                     avg_p = p[0]
                 max_p = np.max(np.linalg.norm(
                     p-avg_p[np.newaxis, :], axis=1))
@@ -303,15 +280,15 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
 
         # Save values
         if save_data:
-            np.save("{}{}/pos.npy".format(DATA_FOLDER, str(curr_scene)), all_p)
-            np.save("{}{}/vel.npy".format(DATA_FOLDER, str(curr_scene)), all_v)
-            np.save("{}{}/mass.npy".format(
+            np.save("{}/{}/pos.npy".format(DATA_FOLDER, str(curr_scene)), all_p)
+            np.save("{}/{}/vel.npy".format(DATA_FOLDER, str(curr_scene)), all_v)
+            np.save("{}/{}/mass.npy".format(
                 DATA_FOLDER, str(curr_scene)), all_m)
-            np.save("{}{}/radii.npy".format(
+            np.save("{}/{}/radii.npy".format(
                 DATA_FOLDER, str(curr_scene)), all_r)
-            np.save("{}{}/force.npy".format(
+            np.save("{}/{}/force.npy".format(
                 DATA_FOLDER, str(curr_scene)), all_f)
-            np.save("{}{}/data.npy".format(
+            np.save("{}/{}/data.npy".format(
                 DATA_FOLDER, str(curr_scene)), all_data)
     # end for
 

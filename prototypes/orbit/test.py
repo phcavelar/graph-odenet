@@ -16,11 +16,6 @@ from pprint import pprint as pp
 # Default colors
 COLOR_BLACK = (0, 0, 0)
 
-# Visualization constants
-HIST_TIMESTEPS = 100
-TIMESTEP_DELAY = 2
-DATA_FOLDER = './data'
-
 # Pygame Constants
 TIME_DELTA = 0.01
 TIME_EVENT_ID = pygame.USEREVENT+1
@@ -33,6 +28,11 @@ G = 39.478  # 6.67408e-11
 NUM_OF_BODIES = 6
 FLOAT_DTYPE = np.float
 SUN_INDEX = 0
+
+# Visualization constants
+HIST_TIMESTEPS = 100
+TIMESTEP_DELAY = 2
+DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
 
 def generate_initial_values():

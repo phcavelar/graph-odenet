@@ -51,7 +51,10 @@ def process_instance(instance):
         Mtgt[t,r] = 1
     return Oin, Oout, Msrc, Mtgt
 #end process_instance
-            
+          
+          
+# TODO Make training schedule as in the paper
+# TODO Train and test for the 10 folds
 
 if __name__ == "__main__":
     DATA_FOLDER = "./data"

@@ -19,6 +19,7 @@ def read_instance(data_folder, simulation):
             var=fname
         ))
     # end for
+
     return i
 # end read_instance
 
@@ -55,55 +56,68 @@ def process_instance(instance, timestep):
     return Oin, Oout, Msrc, Mtgt
 # end process_instance
 
-def get_epoch(dataset,indexes,batch_size=100):
+
+def get_epoch(dataset, indexes, batch_size=100):
     np.random.shuffle(indexes)
     epoch = dataset[indexes]
     num_instances = epoch.shape[0]
-    for i in range(0,num_instances,batch_size):
+
+    for i in range(0, num_instances, batch_size):
         yield gen_batch(epoch[i:i+batch_size])
-    #end while
-    if i<num_instances:
+
+    if i < num_instances:
         yield gen_batch(epoch[i:])
-#end get_epoch
+# end get_epoch
+
 
 def gen_batch(batch):
     batch_n = batch.shape[0]
-    batch_m = sum( (batch[i,0].shape[0]*batch[i,0].shape[0]-batch[i,0].shape[0] for i in range(batch_n)) )
+    batch_m = sum((batch[i, 0].shape[0]*batch[i, 0].shape[0] -
+                   batch[i, 0].shape[0] for i in range(batch_n)))
     float_dtype = batch.dtype
     O_shape = batch.shape[-1]
-    bOin = np.zeros([batch_n,O_shape], float_dtype)
-    bOout = np.zeros([batch_n,O_shape], float_dtype)
-    bMsrc = np.zeros([batch_n,batch_m], float_dtype)
-    bMtgt = np.zeros([batch_n,batch_m], float_dtype)
+    bOin = np.zeros([batch_n, O_shape], float_dtype)
+    bOout = np.zeros([batch_n, O_shape], float_dtype)
+    bMsrc = np.zeros([batch_n, batch_m], float_dtype)
+    bMtgt = np.zeros([batch_n, batch_m], float_dtype)
     n_list = []
     m_list = []
     n_acc = 0
     m_acc = 0
+
     for i in range(batch_n):
-        Oin, Oout = batch[i,0], batch[i,1]
+        Oin, Oout = batch[i, 0], batch[i, 1]
         n = Oin.shape[0]
-        
-        bOin[n_acc:n_acc+n,:] = Oin[:,:]
-        bOout[n_acc:n_acc+n,:] = Oout[:,:]
-        
+
+        bOin[n_acc:n_acc+n, :] = Oin[:, :]
+        bOout[n_acc:n_acc+n, :] = Oout[:, :]
+
         Adj_matrix = np.ones([n, n]) - np.eye(n)
         relations = [(src, tgt) for src in range(n)
                      for tgt in range(n) if Adj_matrix[src, tgt] != 0]
 
         m = len(relations)
+
         for r, (s, t) in enumerate(relations):
             bMsrc[n+s, m+r] = 1
             bMtgt[n+t, m+r] = 1
-        #end for
+        # end for
+
         n_list.append(n)
         m_list.append(m)
-    #end for
-    return bOin, bOout, bMsrc, bMtgt, n_list, m_list
-#end gen_batch
+    # end for
 
-def prepare_dataset(num_of_bodies=6):
+    return bOin, bOout, bMsrc, bMtgt, n_list, m_list
+# end gen_batch
+
+
+DEFAULT_NUM_OF_BODIES = 6
+
+
+def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
+    PERCENTILES_FILE = "./dataset/percentiles.npy"
     MAX_TSTEP = 1000
     NUM_FOLDS = 10
     NUM_TRAIN_INSTANCES = .5  # 1000000
@@ -134,17 +148,21 @@ def prepare_dataset(num_of_bodies=6):
     percentiles = [5, 50, 95]
     value_percentiles = np.zeros([len(percentiles), input_shape[-1]])
 
-    for attridx in range(input_shape[-1]):
-        value_percentiles[:, attridx] = np.percentile(
-            inputs[:, :, attridx], percentiles)
+    if num_of_bodies != DEFAULT_NUM_OF_BODIES:  # Load percentiles
+        value_percentiles = np.load(PERCENTILES_FILE)
+    else:  # Compute percentiles and save them
+        for attridx in range(input_shape[-1]):
+            value_percentiles[:, attridx] = np.percentile(
+                inputs[:, :, attridx], percentiles)
+        np.save(PERCENTILES_FILE, value_percentiles)
 
     def normalise(x): return (
-        (2*((x-value_percentiles[1])/(value_percentiles[2]-value_percentiles[0])))-1)
+        (2 * ((x-value_percentiles[1])/(value_percentiles[2]-value_percentiles[0]))) - 1)
 
     np.save(
         "{}/normvals.npy".format(DATASET_FOLDER), value_percentiles
     )
-    
+
     values_size = len(simulations)*(MAX_TSTEP-1)
     dataset = np.zeros([values_size, 2, *input_shape])
     vidx = 0
@@ -159,24 +177,25 @@ def prepare_dataset(num_of_bodies=6):
             vidx += 1
         # end for
     # end for
-    
+
     np.save(
         "{}/dataset.npy".format(DATASET_FOLDER), dataset
     )
-    
+
     n_train = int(values_size*NUM_TRAIN_INSTANCES)
     n_validation = int(values_size*NUM_VALIDATION_INSTANCES)
     n_test = int(values_size*NUM_TEST_INSTANCES)
-    
+
     for fold in tqdm.trange(NUM_FOLDS, desc="Fold"):
-        fold_instances = np.random.choice(values_size, n_train + n_validation + n_test, replace=False)
+        fold_instances = np.random.choice(
+            values_size, n_train + n_validation + n_test, replace=False)
         train = fold_instances[:n_train]
         validation = fold_instances[n_train:n_train + n_validation]
         test = fold_instances[n_train + n_validation:]
-        
-        np.save("{}/{}.train.npy".format(DATASET_FOLDER,fold), train)
-        np.save("{}/{}.validation.npy".format(DATASET_FOLDER,fold), validation)
-        np.save("{}/{}.test.npy".format(DATASET_FOLDER,fold), test)
+
+        np.save("{}/{}.train.npy".format(DATASET_FOLDER, fold), train)
+        np.save("{}/{}.validation.npy".format(DATASET_FOLDER, fold), validation)
+        np.save("{}/{}.test.npy".format(DATASET_FOLDER, fold), test)
     # end
 
 

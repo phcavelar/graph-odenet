@@ -57,8 +57,10 @@ def process_instance(instance, timestep):
 # end process_instance
 
 
-def get_epoch(dataset, indexes, batch_size=100):
-    np.random.shuffle(indexes)
+def get_epoch(dataset, indexes, batch_size=100, shuffle=True):
+    if shuffle:
+        np.random.shuffle(indexes)
+
     epoch = dataset[indexes]
     num_instances = epoch.shape[0]
 

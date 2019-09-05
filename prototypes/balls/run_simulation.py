@@ -97,7 +97,7 @@ def generate_initial_values():
     return v, v2, p, p2, r, m, d, c, collision
 
 
-def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None, distance=None, save_data=False):
+def interaction(dt, pos, vel, mass, radii=None, collision=None, out_pos=None, out_vel=None, distance=None):
     """
     Compute the physical interaction between n-many balls
     """
@@ -190,6 +190,15 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
 
             delay = 0
 
+        # Generate placeholders
+        all_p, all_v, all_m, all_r, all_collision, all_data = np.zeros(
+            [max_timesteps, *p.shape]), np.zeros(
+            [max_timesteps, *v.shape]), np.zeros(
+            [max_timesteps, *m.shape]), np.zeros(
+            [max_timesteps, *r.shape]), np.zeros(
+            [max_timesteps, *collision.shape]), np.zeros(
+            [max_timesteps, 2, *WALL_GAP.shape])
+
         # Run this scene for max_timesteps steps
         for curr_timestep in trange(max_timesteps, desc="Timestep"):
             if draw:
@@ -199,6 +208,10 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                         if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                             sys.exit()
                         if event.type == TIME_EVENT_ID:
+                            if save_data:
+                                for all_x, x in zip([all_p, all_v, all_m, all_r, all_collision, all_data], [p, v, m, r, collision + np.transpose(collision), np.array([WALL_GAP, WALL_SIZE])]):
+                                    all_x[curr_timestep] = x.copy()
+
                             interaction(
                                 TIME_DELTA,
                                 p,
@@ -208,8 +221,7 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                                 collision=collision,
                                 out_pos=p2,
                                 out_vel=v2,
-                                distance=d,
-                                save_data=save_data
+                                distance=d
                             )
 
                             # Swap position and velocities
@@ -252,16 +264,8 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                 pygame.display.flip()
             else:
                 if save_data:
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.pos.npy', p)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.vel.npy', v)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.mass.npy', m)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.radii.npy', r)
-                    np.save(DATA_FOLDER + str(curr_scene) + "/" +
-                            str(curr_timestep) + '.data.npy', np.array([WALL_GAP, WALL_SIZE]))
+                    for all_x, x in zip([all_p, all_v, all_m, all_r, all_collision, all_data], [p, v, m, r, collision + np.transpose(collision), np.array([WALL_GAP, WALL_SIZE])]):
+                        all_x[curr_timestep] = x.copy()
 
                 interaction(
                     TIME_DELTA,
@@ -272,8 +276,7 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                     collision=collision,
                     out_pos=p2,
                     out_vel=v2,
-                    distance=d,
-                    save_data=save_data
+                    distance=d
                 )
 
                 # Swap position and velocities
@@ -281,6 +284,12 @@ def run_simulation(draw=False, save_data=False, num_scenes=1000, max_timesteps=2
                 v, v2 = v2, v
             # end if
         # end for
+
+        # Save values
+        if save_data:
+            for force_type, force_var in zip(["pos", "vel", "mass", "radii", "collision", "data"], [all_p, all_v, all_m, all_r, all_collision, all_data]):
+                np.save("{}/{}/{}.npy".format(DATA_FOLDER,
+                                              str(curr_scene), force_type), force_var)
     # end for
 
 

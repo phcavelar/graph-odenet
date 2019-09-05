@@ -108,3 +108,6 @@ venv.bak/
 
 # Generated data
 prototypes/**/data/*/*
+
+# Numpy files
+*.npy

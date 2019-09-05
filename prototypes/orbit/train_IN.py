@@ -114,7 +114,7 @@ def train(
     value_percentiles = np.load(PERCENTILES_FNAME).astype(np.float32)[:,:PREDICTED_VALUES]
     pytvalue_percentiles = torch.tensor(value_percentiles)
     if use_cuda:
-        pytvalue_percentiles = pytvalue_percentiles.gpu()
+        pytvalue_percentiles = pytvalue_percentiles.cuda()
     denormalise = lambda x: (((x+1)/2)*(value_percentiles[2]-value_percentiles[0]))+value_percentiles[1]
     pytdenormalise = lambda x: (((x+1)/2)*(pytvalue_percentiles[2]-pytvalue_percentiles[0]))+pytvalue_percentiles[1]
 
@@ -189,7 +189,7 @@ def train(
 
                     val_loss = np.mean(val_loss)
                     val_loss_unnorm = np.mean(val_loss_unnorm)
-                    print("{batch},{loss:f},{unnorm_loss}".format(batch=b,loss=valid_loss,unnorm_loss=test_loss), file=valid_log_file)
+                    print("{batch},{loss:f},{unnorm_loss}".format(batch=b,loss=valid_loss,unnorm_loss=test_loss), file=valid_log_file, flush=True)
                     validation_sch[:-1] = validation_sch[1:]
                     validation_sch[-1] = val_loss
                     if np.sum(validation_sch[1:]-validation_sch[:-1]) > 0:
@@ -221,8 +221,8 @@ def train(
 
             test_loss = np.mean(test_loss)
             test_loss_unnorm = np.mean(test_loss_unnorm)
-            tqdm.tqdm.write("Test_loss: " + str(test_loss))
-            print("{fold},{loss:f},{unnorm_loss}".format(fold=fold,loss=test_loss,unnorm_loss=test_loss_unnorm), file=test_log_file)
+            print("{fold},{loss:f},{unnorm_loss}".format(fold=fold,loss=test_loss,unnorm_loss=test_loss_unnorm), file=test_log_file, flush=True)
+            tqdm.tqdm.write("Test_loss: " + str(test_loss) + " Denormalised Test Loss: "+ str(test_loss_unnorm))
 
             SAVE_PATH = "{}/{model_name}_{fold}_{epoch}".format(MODEL_FOLDER, model_name=model_name, fold=fold, epoch=epoch)
             torch.save(model.state_dict(), SAVE_PATH)

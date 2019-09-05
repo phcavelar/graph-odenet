@@ -68,7 +68,6 @@ def process_instance(instance):
 # end process_instance
 
 
-# TODO Save trained model
 # TODO Train and test for the 10 folds
 if __name__ == "__main__":
     DATASET_FOLDER = "./dataset/6"
@@ -164,4 +163,8 @@ if __name__ == "__main__":
         #end for
         test_loss = np.mean(val_loss)
         tqdm.tqdm.write(str(test_loss))
+        # Saving/Loading TODO:
+        # torch.save(model.state_dict(), PATH)
+        # model = Model(*args, **kwargs)
+        # model.load_state_dict(torch.load(PATH))
     #end for

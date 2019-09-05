@@ -111,3 +111,7 @@ prototypes/**/data/*/*
 
 # Numpy files
 *.npy
+
+# Log files
+log.*
+*.log

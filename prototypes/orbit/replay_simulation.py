@@ -32,8 +32,8 @@ SUN_MASS = 100
 MIN_POSITION, MAX_POSITION = (10, 100)
 
 # Visualization constants
-HIST_TIMESTEPS = 20
-TIMESTEP_DELAY = 2
+HIST_TIMESTEPS = 200
+TIMESTEP_DELAY = 10
 DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
 
@@ -82,62 +82,67 @@ def replay_simulation(folds: int = 10):
     """
     REPLAY_FOLDER = './output'
 
-    for replay_file in os.listdir(REPLAY_FOLDER):
+    for replay_file in [x for x in os.listdir(REPLAY_FOLDER) if ".git" not in x]:
         replay_np = np.load("{}/{}".format(REPLAY_FOLDER, replay_file))
 
         pygame.init()
         # screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
-        pygame.time.set_timer(TIME_EVENT_ID, int(1000*TIME_DELTA))
+        pygame.time.set_timer(TIME_EVENT_ID, int(10000*TIME_DELTA))
 
         # Configure variables to draw
         delay = 0
         radius = 0
 
         # Configure history
-        hp = np.empty((HIST_TIMESTEPS, replay_np[0][0].shape,
+        hp = np.empty((HIST_TIMESTEPS, replay_np.shape[1],
                        NUM_DIMS), dtype=np.float)
         hp[:] = np.nan
 
-        c = np.random.randint(85, 255, size=(replay_np[0][0].shape, 3))
+        c = np.random.randint(85, 255, size=(replay_np.shape[1], 3))
 
         old_p = None
-        for vx, vy, px, py, m in replay_np:
+        
+        first_position = replay_np[0]
+        vx_p, vy_p, px_p, py_p, m_p = np.split(replay_np[0],replay_np[0].shape[-1],-1)
+        r_p = compute_radius(m_p)
+        v_p = np.concatenate([vx_p,vy_p], axis=-1)
+        p_p = np.concatenate([px_p,py_p], axis=-1)
+        
+        for bodies in replay_np:
+            vx, vy, px, py, m = np.split(bodies,bodies.shape[-1],-1)
             r = compute_radius(m)
-            v = np.concatenate(vx[..., np.newaxis],
-                               vy[..., np.newaxis], axis=-1)
-            p = np.concatenate(px[..., np.newaxis],
-                               py[..., np.newaxis], axis=-1)
-
+            v = np.concatenate([vx,vy], axis=-1)
+            p = np.concatenate([px,py], axis=-1)
+            
+            pass_next = False
             redraw = False
             while not redraw:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         sys.exit()
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                        pass_next = True
+                        redraw = True
                     if event.type == TIME_EVENT_ID:
 
-                        # nbody(
-                        #     TIME_DELTA,
-                        #     p,
-                        #     v,
-                        #     m,
-                        #     out_pos=p2,
-                        #     out_vel=v2,
-                        #     force_placeholder=f,
-                        #     distance_placeholder=d,
-                        #     G=G
-                        # )
-
-                        # # Swap position and velocities
-                        # p, p2 = p2, p
-                        # v, v2 = v2, v
+                        p_p, v_p, _ = nbody(
+                            TIME_DELTA,
+                            p_p,
+                            v_p,
+                            m_p,
+                            G=G
+                        )
 
                         # End the loop, to be able to redraw the simulation
                         redraw = True
                     # end if
                 # end for
             # end while
+            
+            if pass_next:
+              break
 
             # Update the timesteps
             delay = (delay + 1) % TIMESTEP_DELAY
@@ -147,18 +152,21 @@ def replay_simulation(folds: int = 10):
             hp[HIST_TIMESTEPS-1, :, :] = p[:, :]
 
             # Recompute the max_p and radius, used to configure zoom
-            avg_p = np.mean(p, axis=0)
-            max_p = np.max(np.linalg.norm(
-                p-avg_p[np.newaxis, :], axis=1))
-            radius = max(1.5 * max_p, radius)
-            # radius = 1.5*max_p # Uncomment for trippier visualisation
+            avg_p = [0,0]#np.mean(p, axis=0)
+            #max_p = np.max(np.linalg.norm(
+            #    p-avg_p[np.newaxis, :], axis=1))
+            #radius = max(1.5 * max_p, radius)
+            #radius = 1.5*max_p # Uncomment for trippier visualisation
 
-            if HEIGHT < WIDTH:
-                h = 2 * radius
-                w = h * WIDTH/HEIGHT
-            else:
-                w = 2 * radius
-                h = w * HEIGHT/WIDTH
+            #if HEIGHT < WIDTH:
+            #    h = 2 * radius
+            #    w = h * WIDTH/HEIGHT
+            #else:
+            #    w = 2 * radius
+            #    h = w * HEIGHT/WIDTH
+            radius = 80
+            h = 2 * radius
+            w = h * WIDTH/HEIGHT
 
             # Redraw the planets/sun in the simulation
             screen.fill(COLOR_BLACK)
@@ -175,6 +183,18 @@ def replay_simulation(folds: int = 10):
                                     min(WIDTH, HEIGHT) / radius)),
                             list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                         )
+            
+            for i in range(NUM_OF_BODIES):
+                  pygame.gfxdraw.filled_circle(
+                      screen,
+                      int(WIDTH/2 +
+                          (p_p[i, 0] - avg_p[0]) * WIDTH/w),
+                      int(HEIGHT/2 + (p_p[i, 1] -
+                                      avg_p[1]) * HEIGHT/h),
+                      int(max(1, r[i, 0] *
+                              min(WIDTH, HEIGHT) / radius)),
+                      [255, 255, 255, 100]
+                  )
 
             # Flip color buffer
             pygame.display.flip()

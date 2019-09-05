@@ -72,6 +72,7 @@ def process_instance(instance):
 def train(
         train=False,
         test=False,
+        rollout=False,
         num_of_bodies=6,
         model="IN",
         num_epochs=2000,
@@ -236,6 +237,53 @@ def train(
         test_log_file.close()
     elif test:
         tqdm.tqdm.write("Test procedure...")
+        test_log_file = open(TEST_LOG_FNAME.format(model_name=model_name),"w")
+        tqdm.tqdm.write("Train procedure...")
+        for fold in tqdm.trange(num_folds, desc="Fold"):
+            # Load model
+            model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
+            if use_cuda:
+                model = model.cuda()
+            model_prefix = "{model_name}_{fold}_".format(model_name=model_name, fold=fold)
+            saved_files = sorted(x for x in os.listdir(MODEL_FOLDER) if model_prefix in x )
+            
+            model.load_state_dict(torch.load("{}/{}".format(MODEL_FOLDER,saved_files[-1])))
+            model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
+            if use_cuda:
+                model = model.cuda()
+            test = np.load("{}/{}.test.npy".format(DATASET_FOLDER, fold))
+
+            model.eval()
+            test_loss = []
+            test_loss_unnorm = []
+            for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, test, batch_size)), total=test.shape[0]/batch_size, desc="Test"):
+                bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                    np.float32)), batch[:-2])
+                n_list, m_list = batch[-2:]
+                if use_cuda:
+                    bOin, bOout, bMsrc, bMtgt = map(
+                        lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
+                with torch.no_grad():
+                    Pred = model(bOin, None, None, bMsrc, bMtgt)
+                    loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
+                    unnorm_loss = F.mse_loss(pytdenormalise_v(Pred),pytdenormalise_v(bOout[:, :PREDICTED_VALUES]))
+                # end with
+                test_loss.append(loss.cpu().item())
+                test_loss_unnorm.append(unnorm_loss.cpu().item())
+            # end for
+
+            test_loss = np.mean(test_loss)
+            test_loss_unnorm = np.mean(test_loss_unnorm)
+            print("{fold},{loss:f},{unnorm_loss}".format(fold=fold,loss=test_loss,unnorm_loss=test_loss_unnorm), file=test_log_file, flush=True)
+            tqdm.tqdm.write("Test_loss: " + str(test_loss) + " Denormalised Test Loss: "+ str(test_loss_unnorm))
+
+            SAVE_PATH = "{}/{model_name}_{fold}_{epoch}".format(MODEL_FOLDER, model_name=model_name, fold=fold, epoch=epoch)
+            torch.save(model.state_dict(), SAVE_PATH)
+            
+        # end for
+        test_log_file.close()
+    elif rollout:
+        tqdm.tqdm.write("Rollout procedure...")
 
         # Load model
         model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
@@ -276,6 +324,10 @@ def train(
                     np.save("{}/{fold}_{batch}.npy".format(OUTPUT_FOLDER, fold=fold, batch=b), denormalise(O_save.cpu().detach().numpy()))
                 # end for
             # end with
+        #end for
+    else:
+        print("Provide one of: --train, --test, --rollout")
+    #end if
 
 
 

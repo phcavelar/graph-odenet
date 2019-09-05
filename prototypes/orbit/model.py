@@ -160,7 +160,7 @@ class IN_ODE(nn.Module):
         self.odefunc.set_fixed(Otail, Msrc, Mtgt)
         P = odeint(self.odefunc, Ohead, self.integration_time,
                    rtol=self.tol, atol=self.tol)
-        return P
+        return P[-1]
 
     @property
     def nfe(self):

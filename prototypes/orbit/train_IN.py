@@ -166,7 +166,6 @@ def train(
                     loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
                     loss.backward()
                     optimizer.step()
-                    break
                 # end for
 
                 if validation.shape[0]>0:
@@ -186,7 +185,6 @@ def train(
                         # end with
                         val_loss.append(loss.cpu().item())
                         val_loss_unnorm.append(unnorm_loss.cpu().item())
-                        break
                     # end for
 
                     val_loss = np.mean(val_loss)
@@ -219,7 +217,6 @@ def train(
                 # end with
                 test_loss.append(loss.cpu().item())
                 test_loss_unnorm.append(unnorm_loss.cpu().item())
-                break
             # end for
 
             test_loss = np.mean(test_loss)
@@ -268,7 +265,7 @@ def train(
 
             test_loss = np.mean(test_loss)
             test_loss_unnorm = np.mean(test_loss_unnorm)
-            tqdm.tqdm.write("| Loss | " + str(test_loss))
+            tqdm.tqdm.write("| Loss | " + str(test_loss) + "| Denormalised Loss | " + str(test_loss_unnorm))
 
             # Save bOout to output
             np.save("{}/{}.npy".format(OUTPUT_FOLDER, fold))

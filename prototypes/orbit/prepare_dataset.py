@@ -120,7 +120,8 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     PERCENTILES_FILE = "./dataset/percentiles.npy"
-    assert 1==sum((train_pct,test_pct,val_pct)), "Total percentage must sum to at most 1"
+    assert sum(train_pct, test_pct,
+               val_pct) <= 1, "Total percentage must sum to at most 1"
 
     print("Cleaning and preparing dataset folders")
     if os.path.isdir(DATASET_FOLDER):
@@ -154,9 +155,6 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
                 inputs[:, :, attridx], percentiles)
         np.save(PERCENTILES_FILE, value_percentiles)
 
-    def normalise(x): return (
-        (2 * ((x-value_percentiles[1])/(value_percentiles[2]-value_percentiles[0]))) - 1)
-
     np.save(
         "{}/normvals.npy".format(DATASET_FOLDER), value_percentiles
     )
@@ -167,9 +165,9 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
     for sim in tqdm.tqdm(simulations):
         sim_instance = read_instance(DATA_FOLDER, sim)
         for t in tqdm.trange(max_timesteps-1):
-            Oin = get_O(sim_instance, t)
-            Oout = get_O(sim_instance, t+1)
-            Oin, Oout = normalise(Oin), normalise(Oout)
+            Oin, Oout = get_O(sim_instance, t), get_O(sim_instance, t+1)
+            Oin, Oout = map(lambda x: (
+                2 * ((x - value_percentiles[1]) / (value_percentiles[2] - value_percentiles[0]))) - 1, [Oin, Oout])
             dataset[vidx, 0, ...] = Oin[...]
             dataset[vidx, 1, ...] = Oout[...]
             vidx += 1

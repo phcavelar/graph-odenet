@@ -287,16 +287,9 @@ def run_simulation(draw:bool=False, save_data:bool=False, start_at:int=0, num_sc
 
         # Save values
         if save_data:
-            np.save("{}/{}/pos.npy".format(DATA_FOLDER, str(curr_scene)), all_p)
-            np.save("{}/{}/vel.npy".format(DATA_FOLDER, str(curr_scene)), all_v)
-            np.save("{}/{}/mass.npy".format(
-                DATA_FOLDER, str(curr_scene)), all_m)
-            np.save("{}/{}/radii.npy".format(
-                DATA_FOLDER, str(curr_scene)), all_r)
-            np.save("{}/{}/force.npy".format(
-                DATA_FOLDER, str(curr_scene)), all_f)
-            np.save("{}/{}/data.npy".format(
-                DATA_FOLDER, str(curr_scene)), all_data)
+            for force_type, force_var in zip(["pos", "vel", "mass", "radii", "force", "data"], [all_p, all_v, all_m, all_r, all_f, all_data]):
+                np.save("{}/{}/{}.npy".format(DATA_FOLDER,
+                                              str(curr_scene), force_type), force_var)
     # end for
 
 

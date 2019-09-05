@@ -106,7 +106,7 @@ if __name__ == "__main__":
             model.train()
             for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset,train,BATCH_SIZE)), total=train.shape[0]/BATCH_SIZE, desc="Batch Train"):
                 # Random noise schedule
-                if epoch<250:
+                if epoch<NOISE_EPOCH_STOP_DECAY:
                     bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
                     noise = np.random.normal(0,NOISE_STD,size=np.prod(bOin.shape))
                     # decay the proportion

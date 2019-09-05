@@ -17,7 +17,7 @@ from pprint import pprint as pp
 COLOR_BLACK = (0, 0, 0)
 
 # Pygame Constants
-TIME_DELTA = 0.01
+TIME_DELTA = 0.001
 TIME_EVENT_ID = pygame.USEREVENT+1
 WIDTH = 1620
 HEIGHT = 1080
@@ -28,6 +28,7 @@ G = 39.478  # 6.67408e-11
 NUM_OF_BODIES = 6
 FLOAT_DTYPE = np.float
 SUN_INDEX = 0
+MIN_POSITION, MAX_POSITION = (10, 100)
 
 # Visualization constants
 HIST_TIMESTEPS = 100
@@ -41,8 +42,8 @@ def generate_initial_values():
     """
     v = np.zeros((NUM_OF_BODIES, NUM_DIMS), dtype=FLOAT_DTYPE)
     v2 = np.zeros((NUM_OF_BODIES, NUM_DIMS), dtype=FLOAT_DTYPE)
-    p2 = np.random.uniform(low=10,
-                           high=100, size=(NUM_OF_BODIES, NUM_DIMS))
+    p2 = np.random.uniform(low=MIN_POSITION,
+                           high=MAX_POSITION, size=(NUM_OF_BODIES, NUM_DIMS))
     p2[:, 1] = np.random.uniform(
         low=0, high=2*np.pi, size=NUM_OF_BODIES).astype(FLOAT_DTYPE)
     p = np.zeros((NUM_OF_BODIES, NUM_DIMS), dtype=FLOAT_DTYPE)
@@ -101,7 +102,8 @@ def compute_orbit(v, p, m, r, c, orbit_type):
             ["clockwise", "counterclockwise"]) == "clockwise" else -1
         v[i, 0] = u_force[1] * rotation
         v[i, 1] = -u_force[0] * rotation
-        v[i] *= velocity_magnitude * (1.5 if orbit_type == "elliptical" else 1)
+        v[i] *= velocity_magnitude * (np.interp(np.linalg.norm(p), [MIN_POSITION, MAX_POSITION], [
+                                      1.5, 2/3]) if orbit_type == "elliptical" else 1)
 
     return v, p, m, r, c
 

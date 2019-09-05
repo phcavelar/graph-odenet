@@ -137,7 +137,7 @@ def nbody(dt, pos, vel, mass, radii=None, out_pos=None, out_vel=None,
     return out_pos, out_vel, force_placeholder
 
 
-def run_simulation(draw=False, save_data=False, start_at=0, num_scenes=1000, max_timesteps=1000, num_of_bodies=6, orbit_type="elliptical"):
+def run_simulation(draw:bool=False, save_data:bool=False, start_at:int=0, num_scenes:int=1000, max_timesteps:int=1000, num_of_bodies:int=6, orbit_type:str="elliptical"):
     """
     Run the simulation for `num_scenes` with `num_timesteps` each scene.
     Properly resets the environment and the physical values each scene.
@@ -148,7 +148,7 @@ def run_simulation(draw=False, save_data=False, start_at=0, num_scenes=1000, max
     DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
     # Run num_scenes simulations
-    for curr_scene in trange(start_at, start_at + num_scenes, desc="Scene"):
+    for curr_scene in trange(start_at, start_at + int(num_scenes), desc="Scene"):
         # Create save_data folder
         if save_data:
             os.makedirs("{}/{}".format(DATA_FOLDER, curr_scene), exist_ok=True)

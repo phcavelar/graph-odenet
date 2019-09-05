@@ -116,15 +116,11 @@ def gen_batch(batch):
 DEFAULT_NUM_OF_BODIES = 6
 
 
-def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES):
+def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=.5, val_pct=.0, max_timesteps=1000, num_folds=10):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     PERCENTILES_FILE = "./dataset/percentiles.npy"
-    MAX_TSTEP = 1000
-    NUM_FOLDS = 10
-    NUM_TRAIN_INSTANCES = .5  # 1000000
-    NUM_VALIDATION_INSTANCES = .1  # 200000
-    NUM_TEST_INSTANCES = .1  # 200000
+    assert 1==sum((train_pct,test_pct,val_pct)), "Total percentage must sum to at most 1"
 
     print("Cleaning and preparing dataset folders")
     if os.path.isdir(DATASET_FOLDER):
@@ -134,14 +130,14 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES):
 
     simulations = [x for x in sorted(
         os.listdir(DATA_FOLDER)) if x != ".gitkeep"]
-    values_size = len(simulations)*MAX_TSTEP
+    values_size = len(simulations)*max_timesteps
     Oin = get_O(read_instance(DATA_FOLDER, simulations[0]), 0)
     input_shape = Oin.shape
     inputs = np.zeros([values_size, *input_shape])
     vidx = 0
     for sim in tqdm.tqdm(simulations):
         sim_instance = read_instance(DATA_FOLDER, sim)
-        for t in tqdm.trange(MAX_TSTEP):
+        for t in tqdm.trange(max_timesteps):
             Oin = get_O(sim_instance, t)
             inputs[vidx, ...] = Oin[...]
             vidx += 1
@@ -165,12 +161,12 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES):
         "{}/normvals.npy".format(DATASET_FOLDER), value_percentiles
     )
 
-    values_size = len(simulations)*(MAX_TSTEP-1)
+    values_size = len(simulations)*(max_timesteps-1)
     dataset = np.zeros([values_size, 2, *input_shape])
     vidx = 0
     for sim in tqdm.tqdm(simulations):
         sim_instance = read_instance(DATA_FOLDER, sim)
-        for t in tqdm.trange(MAX_TSTEP-1):
+        for t in tqdm.trange(max_timesteps-1):
             Oin = get_O(sim_instance, t)
             Oout = get_O(sim_instance, t+1)
             Oin, Oout = normalise(Oin), normalise(Oout)
@@ -184,11 +180,11 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES):
         "{}/dataset.npy".format(DATASET_FOLDER), dataset
     )
 
-    n_train = int(values_size*NUM_TRAIN_INSTANCES)
-    n_validation = int(values_size*NUM_VALIDATION_INSTANCES)
-    n_test = int(values_size*NUM_TEST_INSTANCES)
+    n_train = int(values_size*train_pct)
+    n_validation = int(values_size*val_pct)
+    n_test = int(values_size*test_pct)
 
-    for fold in tqdm.trange(NUM_FOLDS, desc="Fold"):
+    for fold in tqdm.trange(num_folds, desc="Fold"):
         fold_instances = np.random.choice(
             values_size, n_train + n_validation + n_test, replace=False)
         train = fold_instances[:n_train]

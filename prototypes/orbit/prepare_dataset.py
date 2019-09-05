@@ -73,9 +73,10 @@ def get_epoch(dataset, indexes, batch_size=100, shuffle=True):
 
 
 def gen_batch(batch):
-    batch_n = batch.shape[0]
+    batch_size = batch.shape[0]
+    batch_n = sum((batch[i, 0].shape[0] for i in range(batch_size)))
     batch_m = sum((batch[i, 0].shape[0]*batch[i, 0].shape[0] -
-                   batch[i, 0].shape[0] for i in range(batch_n)))
+                   batch[i, 0].shape[0] for i in range(batch_size)))
     float_dtype = batch.dtype
     O_shape = batch.shape[-1]
     bOin = np.zeros([batch_n, O_shape], float_dtype)
@@ -87,7 +88,7 @@ def gen_batch(batch):
     n_acc = 0
     m_acc = 0
 
-    for i in range(batch_n):
+    for i in range(batch_size):
         Oin, Oout = batch[i, 0], batch[i, 1]
         n = Oin.shape[0]
 
@@ -107,8 +108,10 @@ def gen_batch(batch):
 
         n_list.append(n)
         m_list.append(m)
+        n_acc+=n
+        m_acc+=m
     # end for
-
+    
     return bOin, bOout, bMsrc, bMtgt, n_list, m_list
 # end gen_batch
 

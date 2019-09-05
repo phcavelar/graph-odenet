@@ -111,10 +111,15 @@ def train(
     dataset = np.load("{}/dataset.npy".format(DATASET_FOLDER)
                       ).astype(np.float32)
                       
-    value_percentiles = np.load(PERCENTILES_FNAME).astype(np.float32)[:,:PREDICTED_VALUES]
+    value_percentiles = np.load(PERCENTILES_FNAME).astype(np.float32)
     pytvalue_percentiles = torch.tensor(value_percentiles)
+    velocity_percentiles = value_percentiles[:,:PREDICTED_VALUES]
+    pytvvelocity_percentiles = torch.tensor(velocity_percentiles)
     if use_cuda:
         pytvalue_percentiles = pytvalue_percentiles.cuda()
+        pytvvelocity_percentiles = pytvvelocity_percentiles.cuda()
+    denormalise_v = lambda x: (((x+1)/2)*(velocity_percentiles[2]-velocity_percentiles[0]))+velocity_percentiles[1]
+    pytdenormalise_v = lambda x: (((x+1)/2)*(pytvvelocity_percentiles[2]-pytvvelocity_percentiles[0]))+pytvvelocity_percentiles[1]
     denormalise = lambda x: (((x+1)/2)*(value_percentiles[2]-value_percentiles[0]))+value_percentiles[1]
     pytdenormalise = lambda x: (((x+1)/2)*(pytvalue_percentiles[2]-pytvalue_percentiles[0]))+pytvalue_percentiles[1]
 
@@ -154,13 +159,14 @@ def train(
                             noise.shape[0] * (1-proportion)))
                         noise[idx] = 0
                         bOin += noise.reshape(bOin.shape)
-                        batch = (bOin, bOout, bMsrc, bMtgt, n_list, m_list)
+                        batch = [bOin, bOout, bMsrc, bMtgt, n_list, m_list]
                     # end if
-                    bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(lambda x: torch.tensor(x.astype(
-                        np.float32)) if not type(x) == list else torch.tensor(x, dtype=torch.float), batch)
+                    bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                        np.float32)), batch[:-2])
+                    n_list, m_list = batch[-2:]
                     if use_cuda:
-                        bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(
-                            lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt, n_list, m_list))
+                        bOin, bOout, bMsrc, bMtgt = map(
+                            lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
                     Pred = model(bOin, None, None, bMsrc, bMtgt)
                     optimizer.zero_grad()
                     loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
@@ -173,15 +179,13 @@ def train(
                     val_loss = []
                     val_loss_unnorm = []
                     for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, validation, batch_size)), total=validation.shape[0]/batch_size, desc="Batch Valid"):
-                        bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(lambda x: torch.tensor(x.astype(
-                            np.float32)) if not type(x) == list else torch.tensor(x, dtype=torch.float), batch)
-                        if use_cuda:
-                            bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(
-                                lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt, n_list, m_list))
+                        bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                            np.float32)), batch[:-2])
+                        n_list, m_list = batch[-2:]
                         with torch.no_grad():
                             Pred = model(bOin, None, None, bMsrc, bMtgt)
                             loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
-                            unnorm_loss = F.mse_loss(pytdenormalise(Pred), pytdenormalise(bOout[:, :PREDICTED_VALUES]))
+                            unnorm_loss = F.mse_loss(pytdenormalise_v(Pred), pytdenormalise_v(bOout[:, :PREDICTED_VALUES]))
                         # end with
                         val_loss.append(loss.cpu().item())
                         val_loss_unnorm.append(unnorm_loss.cpu().item())
@@ -205,15 +209,16 @@ def train(
             test_loss = []
             test_loss_unnorm = []
             for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, test, batch_size)), total=test.shape[0]/batch_size, desc="Test"):
-                bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(lambda x: torch.tensor(x.astype(
-                    np.float32)) if not type(x) == list else torch.tensor(x, dtype=torch.float), batch)
+                bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                    np.float32)), batch[:-2])
+                n_list, m_list = batch[-2:]
                 if use_cuda:
-                    bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(
-                        lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt, n_list, m_list))
+                    bOin, bOout, bMsrc, bMtgt = map(
+                        lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
                 with torch.no_grad():
                     Pred = model(bOin, None, None, bMsrc, bMtgt)
                     loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
-                    unnorm_loss = F.mse_loss(pytdenormalise(Pred), pytdenormalise(bOout[:, :PREDICTED_VALUES]))
+                    unnorm_loss = F.mse_loss(pytdenormalise_v(Pred),pytdenormalise_v(bOout[:, :PREDICTED_VALUES]))
                 # end with
                 test_loss.append(loss.cpu().item())
                 test_loss_unnorm.append(unnorm_loss.cpu().item())
@@ -234,8 +239,10 @@ def train(
 
         # Load model
         model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
-        LOAD_PATH = sorted(x for x in os.listdir(MODEL_FOLDER) if model_name in x)[-1]
-        model.load_state_dict(torch.load(LOAD_PATH))
+        if use_cuda:
+            model = model.cuda()
+        saved_files = sorted(x for x in os.listdir(MODEL_FOLDER) if (("ODE" in model_name) == ("ODE" in x)) )
+        model.load_state_dict(torch.load("{}/{}".format(MODEL_FOLDER,saved_files[-1])))
 
         # Configure BATCH_SIZE
         batch_size = 999
@@ -245,30 +252,31 @@ def train(
             model.eval()
             test_loss = []
             test_loss_unnorm = []
-            Pred_save = np.array([])
-            for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, test, batch_size, shuffle=False)), total=test.shape[0]/batch_size, desc="Test"):
-                bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(lambda x: torch.tensor(x.astype(
-                    np.float32)) if not type(x) == list else torch.tensor(x, dtype=torch.float), batch)
-                if use_cuda:
-                    bOin, bOout, bMsrc, bMtgt, n_list, m_list = map(
-                        lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt, n_list, m_list))
-                with torch.no_grad():
-                    Pred = model(bOin, None, None, bMsrc, bMtgt)
-                    loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
-                    unnorm_loss = F.mse_loss(pytdenormalise(Pred), pytdenormalise(bOout[:, :PREDICTED_VALUES]))
-                # end with
+            with torch.no_grad():
+                for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, test, batch_size, shuffle=False)), total=test.shape[0]/batch_size, desc="Test"):
+                    O_save = torch.tensor(np.zeros([batch_size+1,num_of_bodies,O_SHAPE], dtype=np.float32))
+                    bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                        np.float32)), batch[:-2])
+                    n_list, m_list = batch[-2:]
+                    bMsrc = bMsrc[:n_list[0],:m_list[0]]
+                    bMtgt = bMtgt[:n_list[0],:m_list[0]]
+                    if use_cuda:
+                        bOin, bOout, bMsrc, bMtgt = map(
+                            lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
+                        O_save = O_save.cuda()
+                    #end if
+                    O_save[0] = bOin[:n_list[0]]
+                    for i in range(1,batch_size+1):
+                            Pred = model(O_save[i-1], None, None, bMsrc, bMtgt)
+                            O_save[i,:,:PREDICTED_VALUES] = Pred[:,:]
+                            O_save[i,:,PREDICTED_VALUES:PREDICTED_VALUES+2] = O_save[i-1,:,PREDICTED_VALUES:PREDICTED_VALUES+2] + Pred[:,:]
+                            O_save[i,:,-1] = O_save[i-1,:,-1]
+                    #end for
+                    # Save bOout to output
+                    np.save("{}/{fold}_{batch}.npy".format(OUTPUT_FOLDER, fold=fold, batch=b), denormalise(O_save.cpu().detach().numpy()))
+                # end for
+            # end with
 
-                test_loss.append(loss.cpu().item())
-                test_loss_unnorm.append(unnorm_loss.cpu().item())
-                Pred_save.append(denormalise(Pred.cpu().detach().numpy()))
-            # end for
-
-            test_loss = np.mean(test_loss)
-            test_loss_unnorm = np.mean(test_loss_unnorm)
-            tqdm.tqdm.write("| Loss | " + str(test_loss) + "| Denormalised Loss | " + str(test_loss_unnorm))
-
-            # Save bOout to output
-            np.save("{}/{}.npy".format(OUTPUT_FOLDER, fold))
 
 
 if __name__ == "__main__":

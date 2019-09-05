@@ -31,7 +31,7 @@ SUN_INDEX = 0
 MIN_POSITION, MAX_POSITION = (10, 100)
 
 # Visualization constants
-HIST_TIMESTEPS = 100
+HIST_TIMESTEPS = 20
 TIMESTEP_DELAY = 2
 DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
@@ -255,7 +255,8 @@ def run_simulation(draw:bool=False, save_data:bool=False, start_at:int=0, num_sc
                                     (hp[t, i, 0] - avg_p[0]) * WIDTH/w),
                                 int(HEIGHT/2 + (hp[t, i, 1] -
                                                 avg_p[1]) * HEIGHT/h),
-                                int(r[i, 0] * min(WIDTH, HEIGHT) / radius),
+                                int(max(1, r[i, 0] *
+                                        min(WIDTH, HEIGHT) / radius)),
                                 list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
                             )
 

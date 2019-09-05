@@ -55,34 +55,22 @@ def process_instance(instance, timestep):
     return Oin, Oout, Msrc, Mtgt
 # end process_instance
 
-def get_epoch(dataset_folder,batch_size=100):
-    dataset_files = ["{}/{}".format(dataset_folder,x) for x in os.listdir(dataset_folder) if ".git" not in x]
-    np.random.shuffle(dataset_files)
-    for batch in gen_batch(dataset_files, batch_size=batch_size):
-        yield batch
-    #end for
+def get_epoch(dataset,indexes,batch_size=100):
+    np.random.shuffle(indexes)
+    epoch = dataset[indexes]
+    num_instances = epoch.shape[0]
+    for i in range(0,num_instances,batch_size):
+        yield gen_batch(epoch[i:i+batch_size])
+    #end while
+    if i<num_instances:
+        yield gen_batch(epoch[i:])
 #end get_epoch
 
-def read_processed_instance(instance):
-    Omerged = np.load(instance)
-    return Omerged[0], Omerged[1]
-#end read_processeed instance
-
-def gen_batch(file_iterator, batch_size=100):
-    batch=[]
-    for f in file_iterator:
-        batch.append(read_processed_instance(f))
-        if len(batch)>=batch_size:
-            yield merge_instances(batch)
-            batch=[]
-    yield merge_instances(batch)
-#end gen_batch
-
-def merge_instances(batch):
-    batch_n = sum( (Oin.shape[0] for Oin, Oout in batch) )
-    batch_m = sum( (Oin.shape[0]*Oin.shape[0]-Oin.shape[0] for Oin, Oout in batch) )
-    float_dtype = batch[0][0].dtype
-    O_shape = batch[0][0].shape[-1]
+def gen_batch(batch):
+    batch_n = batch.shape[0]
+    batch_m = sum( (batch[i,0].shape[0]*batch[i,0].shape[0]-batch[i,0].shape[0] for i in range(batch_n)) )
+    float_dtype = batch.dtype
+    O_shape = batch.shape[-1]
     bOin = np.zeros([batch_n,O_shape], float_dtype)
     bOout = np.zeros([batch_n,O_shape], float_dtype)
     bMsrc = np.zeros([batch_n,batch_m], float_dtype)
@@ -91,7 +79,8 @@ def merge_instances(batch):
     m_list = []
     n_acc = 0
     m_acc = 0
-    for Oin, Oout in batch:
+    for i in range(batch_n):
+        Oin, Oout = batch[i,0], batch[i,1]
         n = Oin.shape[0]
         
         bOin[n_acc:n_acc+n,:] = Oin[:,:]
@@ -110,7 +99,7 @@ def merge_instances(batch):
         m_list.append(m)
     #end for
     return bOin, bOout, bMsrc, bMtgt, n_list, m_list
-#end merge_instances
+#end gen_batch
 
 def prepare_dataset(num_of_bodies=6):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
@@ -121,17 +110,11 @@ def prepare_dataset(num_of_bodies=6):
     NUM_VALIDATION_INSTANCES = .1  # 200000
     NUM_TEST_INSTANCES = .1  # 200000
 
+    print("Cleaning and preparing dataset folders")
     if os.path.isdir(DATASET_FOLDER):
         shutil.rmtree(DATASET_FOLDER)
 
-    print("Cleaning and preparing dataset folders")
     os.mkdir(DATASET_FOLDER)
-
-    for fold in range(NUM_FOLDS):
-        os.mkdir("{}/{}".format(DATASET_FOLDER, fold))
-        for s in ["test", "train", "validation"]:
-            os.mkdir("{}/{}/{}".format(DATASET_FOLDER, fold, s))
-    # end
 
     simulations = [x for x in sorted(
         os.listdir(DATA_FOLDER)) if x != ".gitkeep"]
@@ -159,35 +142,41 @@ def prepare_dataset(num_of_bodies=6):
         (2*((x-value_percentiles[1])/(value_percentiles[2]-value_percentiles[0])))-1)
 
     np.save(
-        "{}/{}/normvals.npy".format(DATASET_FOLDER, fold), value_percentiles
+        "{}/normvals.npy".format(DATASET_FOLDER), value_percentiles
     )
-
-    instances = [(sim, t) for sim in simulations for t in range(MAX_TSTEP-1)]
-    n_train = int(len(instances)*NUM_TRAIN_INSTANCES)
-    n_validation = int(len(instances)*NUM_VALIDATION_INSTANCES)
-    n_test = int(len(instances)*NUM_TEST_INSTANCES)
+    
+    values_size = len(simulations)*(MAX_TSTEP-1)
+    dataset = np.zeros([values_size, 2, *input_shape])
+    vidx = 0
+    for sim in tqdm.tqdm(simulations):
+        sim_instance = read_instance(DATA_FOLDER, sim)
+        for t in tqdm.trange(MAX_TSTEP-1):
+            Oin = get_O(sim_instance, t)
+            Oout = get_O(sim_instance, t+1)
+            Oin, Oout = normalise(Oin), normalise(Oout)
+            dataset[vidx, 0, ...] = Oin[...]
+            dataset[vidx, 1, ...] = Oout[...]
+            vidx += 1
+        # end for
+    # end for
+    
+    np.save(
+        "{}/dataset.npy".format(DATASET_FOLDER), dataset
+    )
+    
+    n_train = int(values_size*NUM_TRAIN_INSTANCES)
+    n_validation = int(values_size*NUM_VALIDATION_INSTANCES)
+    n_test = int(values_size*NUM_TEST_INSTANCES)
+    
     for fold in tqdm.trange(NUM_FOLDS, desc="Fold"):
-        fold_instances = np.random.choice(
-            len(instances), n_train + n_validation + n_test, replace=False)
+        fold_instances = np.random.choice(values_size, n_train + n_validation + n_test, replace=False)
         train = fold_instances[:n_train]
         validation = fold_instances[n_train:n_train + n_validation]
         test = fold_instances[n_train + n_validation:]
-
-        for s, idxs in tqdm.tqdm(zip(["test", "train", "validation"], [test, train, validation]), total=3, desc="Split"):
-            for i in tqdm.tqdm(idxs, desc=s):
-                sim, tstep = instances[i]
-                Oin, Oout, _0, _1 = process_instance(
-                    read_instance(DATA_FOLDER, sim), tstep)
-
-                Oin, Oout = normalise(Oin), normalise(Oout)
-                Omerged = np.append(
-                    Oin[np.newaxis, ...], Oout[np.newaxis, ...], axis=0)
-                np.save(
-                    "{}/{}/{}/{}.npy".format(DATASET_FOLDER,
-                                            fold, s, i), Omerged
-                )
-            # end
-        # end
+        
+        np.save("{}/{}.train.npy".format(DATASET_FOLDER,fold), train)
+        np.save("{}/{}.validation.npy".format(DATASET_FOLDER,fold), validation)
+        np.save("{}/{}.test.npy".format(DATASET_FOLDER,fold), test)
     # end
 
 

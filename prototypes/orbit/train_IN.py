@@ -123,6 +123,7 @@ def train(
     pytdenormalise_v = lambda x: (((x+1)/2)*(pytvvelocity_percentiles[2]-pytvvelocity_percentiles[0]))+pytvvelocity_percentiles[1]
     denormalise = lambda x: (((x+1)/2)*(value_percentiles[2]-value_percentiles[0]))+value_percentiles[1]
     pytdenormalise = lambda x: (((x+1)/2)*(pytvalue_percentiles[2]-pytvalue_percentiles[0]))+pytvalue_percentiles[1]
+    pytnormalise = lambda x: ((2*((x-pytvalue_percentiles[1])/(pytvalue_percentiles[2]-pytvalue_percentiles[0])))-1)
 
     if train:
         test_log_file = open(TEST_LOG_FNAME.format(model_name=model_name),"w")
@@ -302,7 +303,10 @@ def train(
             test_loss_unnorm = []
             with torch.no_grad():
                 for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, test, batch_size, shuffle=False)), total=test.shape[0]/batch_size, desc="Test"):
+                    if b not in [2,3]:
+                        continue
                     O_save = torch.tensor(np.zeros([batch_size+1,num_of_bodies,O_SHAPE], dtype=np.float32))
+                    
                     bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
                         np.float32)), batch[:-2])
                     n_list, m_list = batch[-2:]
@@ -316,12 +320,24 @@ def train(
                     O_save[0] = bOin[:n_list[0]]
                     for i in range(1,batch_size+1):
                             Pred = model(O_save[i-1], None, None, bMsrc, bMtgt)
-                            O_save[i,:,:PREDICTED_VALUES] = Pred[:,:]
-                            O_save[i,:,PREDICTED_VALUES:PREDICTED_VALUES+2] = O_save[i-1,:,PREDICTED_VALUES:PREDICTED_VALUES+2] + Pred[:,:]
+                            denorm_pred = np.empty_like(Pred.cpu().detach().numpy())
+                            denorm_pred[...] = denormalise_v(Pred.cpu().detach().numpy())
+                            denorm_pred = torch.tensor(denorm_pred)
+                            denorm_last = np.empty_like(O_save[i-1].cpu().detach().numpy())
+                            denorm_last[...] = denormalise(O_save[i-1].cpu().detach().numpy())
+                            denorm_last = torch.tensor(denorm_last)
+                            if use_cuda:
+                                denorm_pred = denorm_pred.cuda()
+                                denorm_last = denorm_last.cuda()
+                            denorm_last[:,PREDICTED_VALUES:PREDICTED_VALUES+2] += (denorm_last[:,:PREDICTED_VALUES]+denorm_pred)/2*0.01
+                            denorm_last[:,:PREDICTED_VALUES] = denorm_pred
+                            O_save[i,:,:PREDICTED_VALUES] = pytnormalise(denorm_last)[:,:PREDICTED_VALUES]
+                            O_save[i,:,PREDICTED_VALUES:PREDICTED_VALUES+2] = pytnormalise(denorm_last)[:,PREDICTED_VALUES:PREDICTED_VALUES+2]
                             O_save[i,:,-1] = O_save[i-1,:,-1]
                     #end for
                     # Save bOout to output
                     np.save("{}/{fold}_{batch}.npy".format(OUTPUT_FOLDER, fold=fold, batch=b), denormalise(O_save.cpu().detach().numpy()))
+                    #exit()
                 # end for
             # end with
         #end for

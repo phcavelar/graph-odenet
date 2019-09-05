@@ -74,7 +74,7 @@ if __name__ == "__main__":
     DATASET_FOLDER = "./dataset/6"
     NUM_FOLDS = 10
     NUM_EPOCHS = 2000
-    BATCH_SIZE = 1000
+    BATCH_SIZE = 1000 #Higher since it only occupies about 1gb of VRAM
     O_SHAPE = 5 # vx,vy,px,py,m
     LEARNING_RATE = 0.001
     LR_DECAY = 0.8
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             model.train()
             for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset,train,BATCH_SIZE)), total=train.shape[0]/BATCH_SIZE, desc="Batch Train"):
                 # Random noise schedule
-                if epoch<NOISE_EPOCH_STOP_DECAY:
+                if False and epoch<NOISE_EPOCH_STOP_DECAY:
                     bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
                     noise = np.random.normal(0,NOISE_STD,size=np.prod(bOin.shape))
                     # decay the proportion
@@ -127,7 +127,6 @@ if __name__ == "__main__":
                 loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
                 loss.backward()
                 optimizer.step()
-                #break#TODO remove
             #end for
             
             model.eval()
@@ -141,7 +140,6 @@ if __name__ == "__main__":
                     loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
                 #end with
                 val_loss.append(loss.cpu().item())
-                #break#TODO remove
             #end for
             val_loss = np.mean(val_loss)
             validation_sch[:-1] = validation_sch[1:]
@@ -163,7 +161,6 @@ if __name__ == "__main__":
                 loss = F.mse_loss(Pred, bOout[:,:PREDICTED_VALUES])
             #end with
             test_loss.append(loss.cpu().item())
-            #break#TODO remove
         #end for
         test_loss = np.mean(val_loss)
         tqdm.tqdm.write(str(test_loss))

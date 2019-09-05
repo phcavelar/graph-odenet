@@ -31,7 +31,7 @@ SUN_INDEX = 0
 MIN_POSITION, MAX_POSITION = (10, 100)
 
 # Visualization constants
-HIST_TIMESTEPS = 500
+HIST_TIMESTEPS = 20
 TIMESTEP_DELAY = 2
 DATA_FOLDER = './data/{}'.format(NUM_OF_BODIES)
 
@@ -249,25 +249,16 @@ def run_simulation(draw=False, save_data=False, start_at=0, num_scenes=1000, max
                 for t in range(HIST_TIMESTEPS):
                     for i in range(NUM_OF_BODIES):
                         if not (np.isnan(hp[t, i])).any():
-                            try:
-                                pygame.gfxdraw.filled_circle(
-                                    screen,
-                                    int(WIDTH/2 +
-                                        (hp[t, i, 0] - avg_p[0]) * WIDTH/w),
-                                    int(HEIGHT/2 + (hp[t, i, 1] -
-                                                    avg_p[1]) * HEIGHT/h),
-                                    int(r[i, 0] * min(WIDTH, HEIGHT) / radius),
-                                    list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
-                                )
-                            except pygame.error:
-                                pp(int(WIDTH/2 +
-                                       (hp[t, i, 0] - avg_p[0]) * WIDTH/w))
-                                pp(int(HEIGHT/2 + (hp[t, i, 1] -
-                                                   avg_p[1]) * HEIGHT/h))
-                                pp(int(r[i, 0] * min(WIDTH, HEIGHT) / radius))
-                                pp(list(c[i]) + [255 // (HIST_TIMESTEPS-t)])
-
-                                raise pygame.error
+                            pygame.gfxdraw.filled_circle(
+                                screen,
+                                int(WIDTH/2 +
+                                    (hp[t, i, 0] - avg_p[0]) * WIDTH/w),
+                                int(HEIGHT/2 + (hp[t, i, 1] -
+                                                avg_p[1]) * HEIGHT/h),
+                                int(max(1, r[i, 0] *
+                                        min(WIDTH, HEIGHT) / radius)),
+                                list(c[i]) + [255 // (HIST_TIMESTEPS-t)]
+                            )
 
                 # Flip color buffer
                 pygame.display.flip()

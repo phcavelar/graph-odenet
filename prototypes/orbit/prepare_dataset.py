@@ -179,7 +179,7 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
         sim_instance = read_instance(DATA_FOLDER, sim)
         for t in tqdm.trange(max_timesteps-1):
             Oin, Oout = get_O(sim_instance, t), get_O(sim_instance, t+1)
-            Oin, Oout = map(normalise, [Oin, Oout])
+            Oin, Oout = map(lambda x: normalise(x,value_percentiles), [Oin, Oout])
             dataset[vidx, 0, ...] = Oin[...]
             dataset[vidx, 1, ...] = Oout[...]
             vidx += 1

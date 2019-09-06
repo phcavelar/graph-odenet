@@ -108,33 +108,38 @@ def gen_batch(batch):
 
         n_list.append(n)
         m_list.append(m)
-        n_acc+=n
-        m_acc+=m
+        n_acc += n
+        m_acc += m
     # end for
-    
+
     return bOin, bOout, bMsrc, bMtgt, n_list, m_list
 # end gen_batch
 
+
 def normalise(x, percentiles):
     return (x - percentiles[1]) / (percentiles[2] - percentiles[0])
-#end normalise
+# end normalise
+
 
 def denormalise(x, percentiles):
     return (x * (percentiles[2] - percentiles[0])) + percentiles[1]
-#end denormalise
+# end denormalise
 
-def npmse(y,tgt,axis=None):
+
+def npmse(y, tgt, axis=None):
     return ((y-tgt)**2).mean(axis=axis)
-#end npmse
+# end npmse
+
 
 DEFAULT_NUM_OF_BODIES = 6
+
 
 def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=.5, val_pct=.0, max_timesteps=1000, num_folds=10):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     PERCENTILES_FILE = "./dataset/percentiles.npy"
     assert sum((train_pct, test_pct,
-               val_pct)) <= 1, "Total percentage must sum to at most 1"
+                val_pct)) <= 1, "Total percentage must sum to at most 1"
 
     print("Cleaning and preparing dataset folders")
     if os.path.isdir(DATASET_FOLDER):
@@ -179,7 +184,8 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
         sim_instance = read_instance(DATA_FOLDER, sim)
         for t in tqdm.trange(max_timesteps-1):
             Oin, Oout = get_O(sim_instance, t), get_O(sim_instance, t+1)
-            Oin, Oout = map(lambda x: normalise(x,value_percentiles), [Oin, Oout])
+            Oin, Oout = map(lambda x: normalise(
+                x, value_percentiles), [Oin, Oout])
             dataset[vidx, 0, ...] = Oin[...]
             dataset[vidx, 1, ...] = Oout[...]
             vidx += 1

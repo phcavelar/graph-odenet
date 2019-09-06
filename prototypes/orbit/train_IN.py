@@ -84,6 +84,7 @@ def train(
         num_folds=10,
         simulation_time_delta=0.001
     ):
+
     PERCENTILES_FNAME = "./dataset/percentiles.npy"
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     OUTPUT_FOLDER = "./output"
@@ -124,87 +125,86 @@ def train(
         test_log_file = open(TEST_LOG_FNAME.format(model_name=model_name),"w")
         tqdm.tqdm.write("Train procedure...")
         for fold in tqdm.trange(num_folds, desc="Fold"):
-            valid_log_file = open(VALID_LOG_FNAME.format(model_name=model_name, fold=fold),"w")
-            current_lr = LEARNING_RATE
-            model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
-            if use_cuda:
-                model = model.cuda()
-            optimizer = optim.Adam(model.parameters(),
-                                   lr=current_lr, weight_decay=L2_NORM)
-            train = np.load("{}/{}.train.npy".format(DATASET_FOLDER, fold))
-            test = np.load("{}/{}.test.npy".format(DATASET_FOLDER, fold))
-            validation = np.load(
-                "{}/{}.validation.npy".format(DATASET_FOLDER, fold))
-            validation_sch = np.ones(LR_DECAY_WINDOW) * VAL_LOSS_HIGH
-            
-            try:
-                for epoch in tqdm.trange(num_epochs, desc="Epoch"):
-                    model.train()
-                    for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, train, batch_size)), total=train.shape[0]/batch_size, desc="Batch Train"):
-                        # Random noise schedule
-                        if False and epoch < NOISE_EPOCH_STOP_DECAY:
-                            bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
-                            noise = np.random.normal(
-                                0, NOISE_STD, size=np.prod(bOin.shape))
-                            # decay the proportion
-                            proportion = NOISE_PROPORTION_MAX
-                            if epoch > NOISE_EPOCH_START_DECAY:
-                                proportion *= 1 - \
-                                    ((NOISE_EPOCH_STOP_DECAY-epoch) /
-                                     (NOISE_EPOCH_STOP_DECAY-NOISE_EPOCH_START_DECAY))
+            with open(VALID_LOG_FNAME.format(model_name=model_name, fold=fold),"w") as valid_log_file:
+                current_lr = LEARNING_RATE
+                model = Model(O_SHAPE, 0, 0, PREDICTED_VALUES)
+                if use_cuda:
+                    model = model.cuda()
+                optimizer = optim.Adam(model.parameters(),
+                                    lr=current_lr, weight_decay=L2_NORM)
+                train = np.load("{}/{}.train.npy".format(DATASET_FOLDER, fold))
+                test = np.load("{}/{}.test.npy".format(DATASET_FOLDER, fold))
+                validation = np.load(
+                    "{}/{}.validation.npy".format(DATASET_FOLDER, fold))
+                validation_sch = np.ones(LR_DECAY_WINDOW) * VAL_LOSS_HIGH
+                
+                try:
+                    for epoch in tqdm.trange(num_epochs, desc="Epoch"):
+                        model.train()
+                        for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, train, batch_size)), total=train.shape[0]/batch_size, desc="Batch Train"):
+                            # Random noise schedule
+                            if False and epoch < NOISE_EPOCH_STOP_DECAY:
+                                bOin, bOout, bMsrc, bMtgt, n_list, m_list = batch
+                                noise = np.random.normal(
+                                    0, NOISE_STD, size=np.prod(bOin.shape))
+                                # decay the proportion
+                                proportion = NOISE_PROPORTION_MAX
+                                if epoch > NOISE_EPOCH_START_DECAY:
+                                    proportion *= 1 - \
+                                        ((NOISE_EPOCH_STOP_DECAY-epoch) /
+                                        (NOISE_EPOCH_STOP_DECAY-NOISE_EPOCH_START_DECAY))
+                                # end if
+                                idx = np.random.choice(noise.shape[0], replace=False, size=int(
+                                    noise.shape[0] * (1-proportion)))
+                                noise[idx] = 0
+                                bOin += noise.reshape(bOin.shape)
+                                batch = [bOin, bOout, bMsrc, bMtgt, n_list, m_list]
                             # end if
-                            idx = np.random.choice(noise.shape[0], replace=False, size=int(
-                                noise.shape[0] * (1-proportion)))
-                            noise[idx] = 0
-                            bOin += noise.reshape(bOin.shape)
-                            batch = [bOin, bOout, bMsrc, bMtgt, n_list, m_list]
-                        # end if
-                        bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
-                            np.float32)), batch[:-2])
-                        n_list, m_list = batch[-2:]
-                        if use_cuda:
-                            bOin, bOout, bMsrc, bMtgt = map(
-                                lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
-                        Pred = model(bOin, None, None, bMsrc, bMtgt)
-                        optimizer.zero_grad()
-                        loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
-                        loss.backward()
-                        optimizer.step()
-                    # end for
-
-                    if validation.shape[0]>0:
-                        model.eval()
-                        val_loss = []
-                        val_loss_unnorm = []
-                        for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, validation, batch_size)), total=validation.shape[0]/batch_size, desc="Batch Valid"):
-                            bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(np.float32)), batch[:-2])
-                            if use_cuda:
-                                bOin, bOout, bMsrc, bMtgt = map(lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
+                            bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(
+                                np.float32)), batch[:-2])
                             n_list, m_list = batch[-2:]
-                            with torch.no_grad():
-                                Pred = model(bOin, None, None, bMsrc, bMtgt)
-                                loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
-                                unnorm_loss = npmse(denormalise(getnp(Pred),vpct), denormalise(getnp(bOout[:, :PREDICTED_VALUES]),vpct))
-                            # end with
-                            val_loss.append(loss.cpu().item())
-                            val_loss_unnorm.append(unnorm_loss)
+                            if use_cuda:
+                                bOin, bOout, bMsrc, bMtgt = map(
+                                    lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
+                            Pred = model(bOin, None, None, bMsrc, bMtgt)
+                            optimizer.zero_grad()
+                            loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
+                            loss.backward()
+                            optimizer.step()
                         # end for
 
-                        val_loss = np.mean(val_loss)
-                        val_loss_unnorm = np.mean(val_loss_unnorm)
-                        print("{batch},{loss:f},{unnorm_loss}".format(batch=b,loss=val_loss,unnorm_loss=val_loss_unnorm), file=valid_log_file, flush=True)
-                        validation_sch[:-1] = validation_sch[1:]
-                        validation_sch[-1] = val_loss
-                        if np.sum(validation_sch[1:]-validation_sch[:-1]) > 0:
-                            current_lr *= LR_DECAY
-                            optimizer = optim.Adam(model.parameters(),
-                                                   lr=current_lr, weight_decay=L2_NORM)
-                        # end if
-                    #end if
-                # end for
-            except KeyboardInterrupt:
-                pass
-            valid_log_file.close()
+                        if validation.shape[0] > 0:
+                            model.eval()
+                            val_loss = []
+                            val_loss_unnorm = []
+                            for b, batch in tqdm.tqdm(enumerate(get_epoch(dataset, validation, batch_size)), total=validation.shape[0]/batch_size, desc="Batch Valid"):
+                                bOin, bOout, bMsrc, bMtgt = map(lambda x: torch.tensor(x.astype(np.float32)), batch[:-2])
+                                if use_cuda:
+                                    bOin, bOout, bMsrc, bMtgt = map(lambda x: x.cuda(), (bOin, bOout, bMsrc, bMtgt))
+                                n_list, m_list = batch[-2:]
+                                with torch.no_grad():
+                                    Pred = model(bOin, None, None, bMsrc, bMtgt)
+                                    loss = F.mse_loss(Pred, bOout[:, :PREDICTED_VALUES])
+                                    unnorm_loss = npmse(denormalise(getnp(Pred),vpct), denormalise(getnp(bOout[:, :PREDICTED_VALUES]),vpct))
+                                # end with
+                                val_loss.append(loss.cpu().item())
+                                val_loss_unnorm.append(unnorm_loss)
+                            # end for
+
+                            val_loss = np.mean(val_loss)
+                            val_loss_unnorm = np.mean(val_loss_unnorm)
+                            print("{batch},{loss:f},{unnorm_loss}".format(batch=b,loss=val_loss,unnorm_loss=val_loss_unnorm), file=valid_log_file, flush=True)
+                            validation_sch[:-1] = validation_sch[1:]
+                            validation_sch[-1] = val_loss
+                            if np.sum(validation_sch[1:]-validation_sch[:-1]) > 0:
+                                current_lr *= LR_DECAY
+                                optimizer = optim.Adam(model.parameters(),
+                                                    lr=current_lr, weight_decay=L2_NORM)
+                            # end if
+                        #end if
+                    # end for
+                except KeyboardInterrupt:
+                    pass
 
             model.eval()
             test_loss = []
@@ -230,6 +230,7 @@ def train(
             print("{fold},{loss:f},{unnorm_loss}".format(fold=fold,loss=test_loss,unnorm_loss=test_loss_unnorm), file=test_log_file, flush=True)
             tqdm.tqdm.write("Test_loss: " + str(test_loss) + " Denormalised Test Loss: "+ str(test_loss_unnorm))
 
+            # Save model
             SAVE_PATH = "{}/{model_name}_{fold}_{epoch}".format(MODEL_FOLDER, model_name=model_name, fold=fold, epoch=epoch)
             torch.save(model.state_dict(), SAVE_PATH)
             
@@ -292,7 +293,7 @@ def train(
         saved_files = sorted(x for x in os.listdir(MODEL_FOLDER) if (("ODE" in model_name) == ("ODE" in x)) )
         model.load_state_dict(torch.load("{}/{}".format(MODEL_FOLDER,saved_files[-1])))
 
-        # Configure BATCH_SIZE
+        # Configure BATCH_SIZE to be one entire scene
         batch_size = 999
 
         for fold in tqdm.trange(num_folds, desc="Fold"):

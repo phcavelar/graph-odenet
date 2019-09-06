@@ -123,8 +123,8 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
     DATASET_FOLDER = "./dataset/{}".format(num_of_bodies)
     PERCENTILES_FILE = "./dataset/percentiles.npy"
-    assert sum(train_pct, test_pct,
-               val_pct) <= 1, "Total percentage must sum to at most 1"
+    assert sum((train_pct, test_pct,
+               val_pct)) <= 1, "Total percentage must sum to at most 1"
 
     print("Cleaning and preparing dataset folders")
     if os.path.isdir(DATASET_FOLDER):

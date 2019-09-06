@@ -115,9 +115,19 @@ def gen_batch(batch):
     return bOin, bOout, bMsrc, bMtgt, n_list, m_list
 # end gen_batch
 
+def normalise(x, percentiles):
+    return (x - percentiles[1]) / (percentiles[2] - percentiles[0])
+#end normalise
+
+def denormalise(x, percentiles):
+    return (x * (percentiles[2] - percentiles[0])) + percentiles[1]
+#end denormalise
+
+def npmse(y,tgt,axis=None):
+    return ((y-tgt)**2).mean(axis=axis)
+#end npmse
 
 DEFAULT_NUM_OF_BODIES = 6
-
 
 def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=.5, val_pct=.0, max_timesteps=1000, num_folds=10):
     DATA_FOLDER = "./data/{}".format(num_of_bodies)
@@ -169,8 +179,7 @@ def prepare_dataset(num_of_bodies=DEFAULT_NUM_OF_BODIES, train_pct=.5, test_pct=
         sim_instance = read_instance(DATA_FOLDER, sim)
         for t in tqdm.trange(max_timesteps-1):
             Oin, Oout = get_O(sim_instance, t), get_O(sim_instance, t+1)
-            Oin, Oout = map(lambda x: (
-                2 * ((x - value_percentiles[1]) / (value_percentiles[2] - value_percentiles[0]))) - 1, [Oin, Oout])
+            Oin, Oout = map(normalise, [Oin, Oout])
             dataset[vidx, 0, ...] = Oin[...]
             dataset[vidx, 1, ...] = Oout[...]
             vidx += 1
